@@ -1,0 +1,1 @@
+export { FixIssuesChat } from './FixIssuesChat';

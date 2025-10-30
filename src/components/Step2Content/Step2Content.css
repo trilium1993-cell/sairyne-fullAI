@@ -1,0 +1,137 @@
+.step2-content {
+  position: relative;
+  width: 100%;
+  height: auto;
+  margin-bottom: 20px;
+}
+
+.step2-content .bf-d-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 17.75px;
+  border: 0.78px solid rgba(255, 255, 255, 0.12);
+  background-color: #141414;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step2-content .bf-d {
+  width: 21.78px;
+  height: 21.78px;
+  object-fit: cover;
+}
+
+.step2-content .text-wrapper-12 {
+  position: absolute;
+  top: 0;
+  left: 40px;
+  font-family: "DM Sans", Helvetica;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0px;
+}
+
+.step2-content .text-wrapper-13 {
+  position: absolute;
+  top: 25px;
+  left: 0;
+  right: 0;
+  font-family: "DM Sans", Helvetica;
+  font-weight: 400;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0px;
+  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.step2-content .line-4,
+.step2-content .line-5,
+.step2-content .line-6 {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  object-fit: cover;
+}
+
+.step2-content .line-4 {
+  top: 80px;
+}
+
+.step2-content .line-5 {
+  top: 120px;
+}
+
+.step2-content .line-6 {
+  top: 160px;
+}
+
+.step2-content .flexcontainer-2 {
+  position: absolute;
+  top: 100px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step2-content .span-wrapper {
+  margin: 0;
+  padding: 0;
+}
+
+.step2-content .text-wrapper-14 {
+  font-family: "DM Sans", Helvetica;
+  font-weight: 600;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+.step2-content .text-wrapper-15 {
+  font-family: "DM Sans", Helvetica;
+  font-weight: 400;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0px;
+}
+
+.step2-content .flexcontainer {
+  position: absolute;
+  top: 200px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.step2-content .text {
+  margin: 0;
+  padding: 0;
+}
+
+.step2-content .span {
+  font-family: "DM Sans", Helvetica;
+  font-weight: 400;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 20px;
+  letter-spacing: 0px;
+  word-break: break-word;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
