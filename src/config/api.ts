@@ -12,10 +12,8 @@
  */
 export const API_URL = import.meta.env.VITE_API_URL || 'https://sairyne-fullai-5.onrender.com';
 
-// Debug: Log API URL in development
-if (import.meta.env.DEV) {
-  console.log('🔍 API_URL:', API_URL);
-}
+// Debug: Log API URL in all modes
+console.log('🔍 API_URL:', API_URL);
 
 /**
  * API Endpoints
