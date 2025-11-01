@@ -15,6 +15,7 @@ import AnalysisPopup from "../AnalysisPopup";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { createChatSteps } from "../../data/chatSteps";
 import { WINDOW, ANIMATION } from "../../constants/dimensions";
+import { ChatService } from "../../services/chatService";
 import arrowsIcon from '../../assets/img/arrows-in-simple-light-1.svg';
 import closeIcon from '../../assets/img/vector.svg';
 
@@ -47,7 +48,8 @@ const ChatContainer = React.memo(({
   chatContainerRef,
   onCompletedNextStep,
   showStep3Content,
-  chatSteps
+  chatSteps,
+  selectedLearnLevel
 }: {
   messages: Message[];
   showOptions: boolean;
@@ -68,6 +70,7 @@ const ChatContainer = React.memo(({
   onCompletedNextStep: () => void;
   showStep3Content: boolean;
   chatSteps: any[];
+  selectedLearnLevel: string;
 }) => {
   return (
         <div 
@@ -96,6 +99,9 @@ const ChatContainer = React.memo(({
 
       {/* Опции из данных шагов */}
       {(() => {
+        // В Pro Mode не показываем статичные опции
+        if (selectedLearnLevel === 'pro') return null;
+        
         const currentStepData = chatSteps.find(step => step.id === currentStep);
         if (currentStepData && currentStepData.options) {
           // Показываем опции только если AI закончил печатать
@@ -285,13 +291,60 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
 
   // Обработка отправки сообщения
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (userInput.trim()) {
-      // Добавляем сообщение пользователя в чат
-      addUserMessage(userInput.trim());
+      const messageText = userInput.trim();
       
+      // Очищаем поле ввода сразу
+      setUserInput("");
+      
+      // Добавляем сообщение пользователя в чат
+      addUserMessage(messageText);
+      
+      // Проверяем режим: Pro Mode = AI, Learn/Create = статичные шаги
+      const isProMode = selectedLearnLevel === 'pro';
+      
+      if (isProMode) {
+        // PRO MODE: Используем AI (OpenAI)
+        try {
+          // Показываем индикатор "AI думает"
+          const thinkingId = Date.now().toString();
+          setMessages(prev => [...prev, {
+            id: thinkingId,
+            type: 'ai',
+            content: '...',
+            timestamp: Date.now(),
+            isThinking: true
+          }]);
+
+          // Отправляем запрос в backend
+          const conversationHistory = messages.map(msg => ({
+            type: msg.type,
+            content: msg.content
+          }));
+          
+          const aiResponse = await ChatService.sendMessage(messageText, conversationHistory);
+          
+          // Удаляем индикатор "думает"
+          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
+          
+          // Добавляем ответ AI с анимацией печатания
+          addAIMessage(aiResponse);
+          
+        } catch (error) {
+          console.error('AI chat error:', error);
+          // Удаляем индикатор "думает"
+          setMessages(prev => prev.filter(msg => msg.isThinking));
+          // Показываем сообщение об ошибке
+          addAIMessage("Sorry, I couldn't process your request. Please try again.");
+        }
+        
+        return;
+      }
+      
+      // LEARN/CREATE MODE: Статичные шаги (существующая логика)
       // Если это сообщение "I'm ready! Let's start!", подсвечиваем кнопку
-      if (userInput.trim() === "I'm ready! Let's start!") {
+      if (messageText === "I'm ready! Let's start!") {
         setReadyButtonHighlighted(true);
       }
       
@@ -782,6 +835,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
               isTogglingVisualTips={isTogglingVisualTips}
               chatContainerRef={chatContainerRef}
               chatSteps={chatSteps}
+              selectedLearnLevel={selectedLearnLevel}
               onCompletedNextStep={() => {
                 // Добавляем сообщение пользователя
                 const userMessage: Message = {
