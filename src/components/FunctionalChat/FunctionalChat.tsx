@@ -434,12 +434,6 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
     }
   };
 
-  // Обработка нажатия Enter
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSendMessage();
-    }
-  };
 
   // Инициализация первого сообщения
   useEffect(() => {
@@ -913,15 +907,20 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
             } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''}`} style={{
               transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
             }}>
-              <input
-                type="text"
+              <textarea
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                onKeyPress={handleKeyPress}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
                 placeholder="Message..."
-                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
+                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none overflow-y-auto"
                 style={{ 
                   width: 'calc(100% - 100px)',
+                  height: 'calc(100% - 60px)',
                   fontFamily: 'var(--body-font-family)',
                   fontSize: 'var(--body-font-size)',
                   fontStyle: 'var(--body-font-style)',
