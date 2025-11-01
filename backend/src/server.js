@@ -101,7 +101,7 @@ app.post('/api/chat/message', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on http://localhost:${PORT}`);
+  console.log(`🚀 Backend server running on port ${PORT}`);
   console.log(`✅ CORS enabled for: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
   console.log(`🤖 OpenAI API key: ${process.env.OPENAI_API_KEY ? 'Configured ✅' : 'Missing ❌'}`);
 });
