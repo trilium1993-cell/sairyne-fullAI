@@ -4,6 +4,8 @@
 
 Interactive music production learning platform with AI-powered guidance for creating House music in Ableton Live.
 
+**Live Demo:** [https://sairyne-full-ai-ujun.vercel.app](https://sairyne-full-ai-ujun.vercel.app)
+
 ---
 
 ## 🚀 Quick Start
@@ -48,10 +50,10 @@ Visit [http://localhost:5173](http://localhost:5173)
 - Vite 6.0
 - Tailwind CSS
 
-### Backend (in development)
+### Backend
 - Node.js + Express
 - OpenAI GPT-4 API
-- PostgreSQL (optional)
+- Deployed on Render.com
 
 ### Plugin
 - JUCE 8 (Audio Engine + WebView wrapper)
@@ -71,11 +73,17 @@ src/
 
 ---
 
-## 🌐 Deploy to Vercel
+## 🌐 Deployment
 
+### Frontend (Vercel)
 1. **Push to GitHub**
 2. **Import to Vercel**
 3. **Deploy automatically**
+
+### Backend (Render)
+1. Follow [Render Deployment Guide](./RENDER_DEPLOYMENT.md)
+2. Set environment variables (OPENAI_API_KEY, CORS_ORIGIN)
+3. Update VITE_API_URL on Vercel
 
 [Deploy Now →](https://vercel.com/new)
 
