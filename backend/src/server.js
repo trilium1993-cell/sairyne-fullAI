@@ -9,6 +9,12 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Debug: Log environment variables (remove in production)
+console.log('🔍 Environment Check:');
+console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING');
+console.log('  CORS_ORIGIN:', process.env.CORS_ORIGIN || 'http://localhost:5173 (default)');
+console.log('  PORT:', PORT);
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
