@@ -83,6 +83,12 @@ app.post('/api/chat/message', async (req, res) => {
 
   } catch (error) {
     console.error('OpenAI API Error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type
+    });
     
     if (error.status === 401) {
       return res.status(401).json({ error: 'Invalid OpenAI API key' });
@@ -94,7 +100,8 @@ app.post('/api/chat/message', async (req, res) => {
 
     res.status(500).json({ 
       error: 'Failed to generate response',
-      details: error.message 
+      details: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN'
     });
   }
 });
