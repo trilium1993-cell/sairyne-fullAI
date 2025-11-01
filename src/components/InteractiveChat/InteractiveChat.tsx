@@ -312,22 +312,48 @@ export const InteractiveChat = ({ onNext, onBack }: InteractiveChatProps): JSX.E
         </div>
 
         {/* Message Input */}
-        <div className="absolute bottom-[10px] left-[10px] w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px]">
+        <div className={`absolute bottom-[10px] left-[10px] w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-300 ${
+          userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''
+        }`}>
           <input
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Message..."
-            className="absolute top-2.5 left-3 w-[calc(100%_-_100px)] font-body font-[number:var(--body-font-weight)] text-[#ffffff6b] text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] placeholder:text-[#ffffff6b] focus:text-white focus:outline-none bg-transparent"
+            className="absolute top-2.5 left-3 w-[calc(100%_-_100px)] font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] placeholder:text-[#ffffff6b] focus:outline-none bg-transparent"
           />
           
-          <img
-            className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer"
-            alt="Send"
-            src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
-            onClick={handleSendMessage}
-          />
+          {userInput ? (
+            <button
+              className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] flex items-center justify-center rounded-md cursor-pointer transition-all duration-300 ease-out bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110"
+              style={{
+                transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+              type="button"
+              aria-label="Send message"
+              onClick={handleSendMessage}
+            >
+              <img
+                className="w-[28px] h-[28px]"
+                alt="Send"
+                src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                style={{
+                  filter: 'brightness(0) invert(1)'
+                }}
+              />
+            </button>
+          ) : (
+            <img
+              className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80"
+              style={{
+                transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+              alt="Send"
+              src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+              onClick={handleSendMessage}
+            />
+          )}
 
           <button
             onClick={handleAnalyze}

@@ -8,12 +8,6 @@ export const VisualTips1 = ({ currentStep }: VisualTips1Props): JSX.Element => {
 
   return (
     <div className="relative w-full h-full">
-      {/* Horizontal line under existing header (inside panel) */}
-      <div
-        className="absolute top-[9px] left-0 w-full h-px bg-[#FFFFFF33] z-[999] pointer-events-none"
-        aria-hidden="true"
-      />
-
       {/* RIGHT SIDE WINDOW from localhost:5174 - adjusted positioning */}
       <img
         className="absolute top-[69px] left-[30px] w-[329px] h-[109px]"

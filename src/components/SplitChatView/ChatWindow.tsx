@@ -338,7 +338,9 @@ export const ChatWindow = (): JSX.Element => {
 
       {/* Поле ввода сообщения */}
       <div className="p-6 border-t border-white/10">
-        <div className="flex gap-3">
+        <div className={`flex gap-3 rounded-lg transition-all duration-300 ${
+          userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''
+        }`}>
           <input
             type="text"
             value={userInput}
@@ -349,7 +351,9 @@ export const ChatWindow = (): JSX.Element => {
           />
           <button
             onClick={handleSendClick}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+            className={`px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-all duration-300 ${
+              userInput ? 'ring-2 ring-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.5)]' : ''
+            }`}
           >
             Send
           </button>

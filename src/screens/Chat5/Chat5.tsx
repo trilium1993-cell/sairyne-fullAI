@@ -215,7 +215,9 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
             e.preventDefault();
             handleSendMessage();
           }}
-          className="absolute left-[calc(50.00%_-_178px)] bottom-2.5 w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] border-[none] backdrop-blur-[18.5px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(18.5px)_brightness(100%)] before:content-[''] before:absolute before:inset-0 before:p-px before:rounded-[7px] before:[background:linear-gradient(180deg,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.01)_100%)] before:[-webkit-mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)] before:[-webkit-mask-composite:xor] before:[mask-composite:exclude] before:z-[1] before:pointer-events-none"
+          className={`absolute left-[calc(50.00%_-_178px)] bottom-2.5 w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] border-[none] backdrop-blur-[18.5px] backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(18.5px)_brightness(100%)] before:content-[''] before:absolute before:inset-0 before:p-px before:rounded-[7px] before:[background:linear-gradient(180deg,rgba(255,255,255,0.11)_0%,rgba(255,255,255,0.01)_100%)] before:[-webkit-mask:linear-gradient(#fff_0_0)_content-box,linear-gradient(#fff_0_0)] before:[-webkit-mask-composite:xor] before:[mask-composite:exclude] before:z-[1] before:pointer-events-none transition-all duration-300 ${
+            message ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''
+          }`}
           role="search"
           aria-label="Message input form"
         >
@@ -229,19 +231,29 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
             onChange={(e) => setMessage(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Message..."
-            className="absolute top-2.5 left-3 w-[calc(100%_-_24px)] font-body font-[number:var(--body-font-weight)] text-[#ffffff6b] text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] placeholder:text-[#ffffff6b] focus:text-white focus:outline-none bg-transparent"
+            className="absolute top-2.5 left-3 w-[calc(100%_-_24px)] font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] placeholder:text-[#ffffff6b] focus:outline-none bg-transparent"
             aria-describedby="message-helper-text"
           />
 
           <button
             type="submit"
-            className="absolute right-1.5 bottom-1.5 w-7 h-7 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50 rounded transition-opacity hover:opacity-80"
+            className={`absolute right-1.5 bottom-1.5 w-7 h-7 flex items-center justify-center rounded-md transition-all duration-300 ease-out focus:outline-none ${
+              message 
+                ? 'bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110'
+                : 'focus:ring-2 focus:ring-white focus:ring-opacity-50 hover:opacity-80'
+            }`}
+            style={{
+              transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+            }}
             aria-label="Send message"
           >
             <img
               className="w-7 h-7"
               alt=""
               src="https://c.animaapp.com/bDY1idTn/img/frame-13.svg"
+              style={{
+                filter: message ? 'brightness(0) invert(1)' : 'none'
+              }}
             />
           </button>
 

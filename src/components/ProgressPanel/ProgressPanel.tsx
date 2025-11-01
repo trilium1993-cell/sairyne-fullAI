@@ -39,7 +39,7 @@ export const ProgressPanel = ({
 
   return (
     <aside
-      className="absolute top-0 left-0 w-[377px] h-[442px] bg-[#ffffff05] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)]"
+      className="absolute top-0 left-0 w-[377px] h-[410px] bg-[#ffffff05] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)]"
       role="complementary"
       aria-label="Project setup progress"
     >
@@ -145,7 +145,7 @@ export const ProgressPanel = ({
 
         <ol className="relative" role="list">
           {steps.map((step, index) => {
-            const topPosition = 148 + index * 37;
+            const topPosition = 148 + index * 35;
 
             return (
               <li key={step.id} className="relative">
@@ -159,15 +159,15 @@ export const ProgressPanel = ({
                   />
                 ) : (
                   <div
-                    className="absolute left-3 w-5 h-5 flex items-center justify-center rounded-[60px] overflow-hidden border border-solid border-[#e8e8e81f]"
+                    className="absolute left-3 w-5 h-5 rounded-[60px] border border-solid border-[#e8e8e81f]"
                     style={{ top: `${topPosition}px` }}
                     aria-hidden="true"
                   >
-                    <div
-                      className={`${step.id === 3 ? "ml-[-3px]" : "-ml-0.5"} -mt-0.5 h-[18px] w-1.5 [font-family:'Inter',Helvetica] font-medium text-white text-[9px] text-center tracking-[0] leading-[18px] whitespace-nowrap`}
+                    <span
+                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 [font-family:'Inter',Helvetica] font-medium text-white text-[9px] tracking-[0] leading-none"
                     >
                       {step.id}
-                    </div>
+                    </span>
                   </div>
                 )}
 
@@ -181,7 +181,7 @@ export const ProgressPanel = ({
                 {index < steps.length - 1 && (
                   <img
                     className="w-[calc(100%_-_26px)] left-3.5 h-px absolute object-cover"
-                    style={{ top: `${topPosition + 29}px` }}
+                    style={{ top: `${topPosition + 27}px` }}
                     alt=""
                     src="https://c.animaapp.com/Pqm9zsUr/img/line-14.svg"
                     aria-hidden="true"
@@ -195,7 +195,7 @@ export const ProgressPanel = ({
 
       <footer>
         <button
-          className="flex w-[377px] h-8 px-3 py-1.5 top-[410px] left-0 bg-[#ffffff05] border-[0.6px] border-solid border-[#ffffff21] items-center justify-center absolute"
+          className="flex w-[377px] h-8 px-3 py-1.5 top-[378px] left-0 bg-[#ffffff05] border-[0.6px] border-solid border-[#ffffff21] items-center justify-center absolute"
           type="button"
           aria-expanded="true"
           aria-label="Hide progress panel"

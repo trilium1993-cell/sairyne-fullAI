@@ -72,7 +72,7 @@ const ChatContainer = React.memo(({
   return (
         <div 
           ref={chatContainerRef} 
-          className="absolute top-[95px] left-[10px] bottom-[140px] overflow-y-auto"
+          className="absolute top-[50px] left-[10px] bottom-[140px] overflow-y-auto"
           style={{ 
             scrollBehavior: isTogglingVisualTips ? 'auto' : 'smooth',
             width: showVisualTips ? '357px' : '357px',
@@ -147,7 +147,12 @@ const ChatContainer = React.memo(({
   );
 });
 
-export const FunctionalChat = (): JSX.Element => {
+interface FunctionalChatProps {
+  onNext?: () => void;
+  onBack?: () => void;
+}
+
+export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
@@ -178,6 +183,7 @@ export const FunctionalChat = (): JSX.Element => {
   const isInitializedRef = useRef(false);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
+  const analysisTimeoutRef = useRef<number | null>(null);
 
   // Получаем название проекта и пользователя из localStorage
   useEffect(() => {
@@ -452,15 +458,27 @@ export const FunctionalChat = (): JSX.Element => {
     setShowProjectAnalysis(false);
     setShowAnalysingChannels(true);
     
+    // Отменяем предыдущий таймер, если он есть
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+    }
+    
     // Имитация FFT обработки - через 5 секунд показываем Analysis Summary
-    setTimeout(() => {
+    analysisTimeoutRef.current = setTimeout(() => {
       setShowAnalysingChannels(false);
       setShowAnalysisSummary(true);
       setHasCompletedAnalysis(true); // Отмечаем, что анализ был выполнен
+      analysisTimeoutRef.current = null;
     }, 5000); // 5 секунд на "анализ"
   }, []);
 
   const handleCancelAnalysis = useCallback(() => {
+    // ✅ ОТМЕНЯЕМ ТАЙМЕР АНАЛИЗА
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+      analysisTimeoutRef.current = null;
+    }
+    
     setShowAnalysingChannels(false);
     setShowProjectAnalysis(true);
   }, []);
@@ -488,9 +506,15 @@ export const FunctionalChat = (): JSX.Element => {
     setShowAnalysisSummary(false);
     setShowAnalysingChannels(true);
     
-    setTimeout(() => {
+    // Отменяем предыдущий таймер, если он есть
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+    }
+    
+    analysisTimeoutRef.current = setTimeout(() => {
       setShowAnalysingChannels(false);
       setShowAnalysisSummary(true);
+      analysisTimeoutRef.current = null;
     }, 5000);
   }, []);
 
@@ -499,9 +523,15 @@ export const FunctionalChat = (): JSX.Element => {
     setShowAnalysisSummary(false);
     setShowAnalysingChannels(true);
     
-    setTimeout(() => {
+    // Отменяем предыдущий таймер, если он есть
+    if (analysisTimeoutRef.current) {
+      clearTimeout(analysisTimeoutRef.current);
+    }
+    
+    analysisTimeoutRef.current = setTimeout(() => {
       setShowAnalysingChannels(false);
       setShowAnalysisSummary(true);
+      analysisTimeoutRef.current = null;
     }, 5000);
   }, []);
 
@@ -715,6 +745,7 @@ export const FunctionalChat = (): JSX.Element => {
                 currentStep={currentStep + 1} 
                 totalSteps={7}
                 completedSteps={completedSteps}
+                onBackToProjects={onBack}
               />
             </div>
 
@@ -825,7 +856,7 @@ export const FunctionalChat = (): JSX.Element => {
             {/* Поле ввода сообщения */}
             <div className={`absolute bottom-[10px] left-[10px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-500 ease-out ${
               showVisualTips ? 'w-[357px]' : 'w-[357px]'
-            }`} style={{
+            } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''}`} style={{
               transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
             }}>
               <input
@@ -834,7 +865,7 @@ export const FunctionalChat = (): JSX.Element => {
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Message..."
-                className="absolute top-[10px] left-[12px] text-[#ffffff6b] bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
+                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
                 style={{ 
                   width: 'calc(100% - 100px)',
                   fontFamily: 'var(--body-font-family)',
@@ -846,15 +877,36 @@ export const FunctionalChat = (): JSX.Element => {
                 }}
               />
 
-              <img
-                className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80"
-                style={{
-                  transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-                }}
-                alt="Send"
-                src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
-                onClick={handleSendMessage}
-              />
+              {userInput ? (
+                <button
+                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] flex items-center justify-center rounded-md cursor-pointer transition-all duration-300 ease-out bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110"
+                  style={{
+                    transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                  }}
+                  type="button"
+                  aria-label="Send message"
+                  onClick={handleSendMessage}
+                >
+                  <img
+                    className="w-[28px] h-[28px]"
+                    alt="Send"
+                    src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                    style={{
+                      filter: 'brightness(0) invert(1)'
+                    }}
+                  />
+                </button>
+              ) : (
+                <img
+                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80"
+                  style={{
+                    transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+                  }}
+                  alt="Send"
+                  src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                  onClick={handleSendMessage}
+                />
+              )}
 
               <button
                 onClick={handleAnalyze}
@@ -943,7 +995,7 @@ export const FunctionalChat = (): JSX.Element => {
         {/* Right Column - Visual Tips Panel */}
         {showVisualTips && !showProjectAnalysis && !showAnalysingChannels && !showAnalysisSummary && (
           <div 
-            className="absolute overflow-y-auto transition-all ease-out"
+            className="absolute overflow-y-auto transition-all ease-out overscroll-none"
             style={{
               top: 0,
               right: `${WINDOW.INNER_LEFT}px`,
@@ -953,31 +1005,33 @@ export const FunctionalChat = (): JSX.Element => {
               transitionTimingFunction: ANIMATION.TIMING_FUNCTION
             }}
           >
-            {/* Visual Tips Header - опущен по вертикали */}
-            <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
-              {/* Close button in left corner */}
-              <button
-                onClick={handleVisualTipsToggle}
-                className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
-                aria-label="Close visual tips"
-              >
-                <img
-                  className="w-[14px] h-[14px]"
-                  alt="Close"
-                  src={closeIcon}
-                />
-              </button>
-              
-              <h2 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
-                Visual tips
-              </h2>
+            {/* Visual Tips Header - sticky */}
+            <div className="sticky top-0 left-0 right-0 z-50 bg-[#141414] h-[40px]">
+              <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
+                {/* Close button in left corner */}
+                <button
+                  onClick={handleVisualTipsToggle}
+                  className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
+                  aria-label="Close visual tips"
+                >
+                  <img
+                    className="w-[14px] h-[14px]"
+                    alt="Close"
+                    src={closeIcon}
+                  />
+                </button>
+                
+                <h2 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
+                  Visual tips
+                </h2>
+              </div>
+
+              {/* Horizontal line for Visual Tips */}
+              <div className="absolute bottom-0 left-0 w-[383px] h-[1px] bg-white/10" />
             </div>
 
-            {/* Horizontal line for Visual Tips - точно как в исходном коде */}
-            <div className="absolute top-[39px] left-0 w-[383px] h-[1px] bg-white/10" />
-
             {/* Visual Tips Content */}
-            <div className="pt-[30px]">
+            <div className="pt-[40px]">
               <ErrorBoundary 
                 componentName="VisualTips"
                 fallback={

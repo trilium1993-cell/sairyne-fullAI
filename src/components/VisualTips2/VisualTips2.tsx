@@ -9,12 +9,6 @@ export const VisualTips2 = ({ currentStep }: VisualTips2Props): JSX.Element => {
 
   return (
     <>
-      {/* Horizontal line under Visual Tips header */}
-      <div
-        className="absolute top-[9px] left-0 w-full h-px bg-[#FFFFFF33] z-[999] pointer-events-none"
-        aria-hidden="true"
-      />
-
       <div className="flex flex-col w-full h-full overflow-y-auto px-6 py-4 gap-4">
         {/* Section Title with Number Badge */}
         <div className="flex items-center gap-3 mb-2">

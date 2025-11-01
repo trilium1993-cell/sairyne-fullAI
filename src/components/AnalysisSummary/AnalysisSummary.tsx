@@ -199,7 +199,7 @@ export const AnalysisSummary: React.FC<AnalysisSummaryProps> = ({
           {/* Fix Issues Button */}
           <button
             onClick={() => onFixIssues(section.title)}
-            className="flex w-[302px] h-[33px] items-center justify-center gap-2.5 px-2.5 py-[7px] absolute left-[55px] rounded-[36px] border border-solid border-[#8c49c375] cursor-pointer hover:bg-[#8c49c310] transition-colors"
+            className="flex w-[302px] h-[33px] items-center justify-center gap-2.5 px-2.5 py-[7px] absolute left-[55px] rounded-[36px] border border-solid border-[#8c49c375] cursor-pointer transition-all duration-300 hover:bg-[linear-gradient(134deg,rgba(115,34,182,0.2)_0%,rgba(83,12,141,0.2)_100%)] hover:border-[#a855f7] hover:shadow-[0_0_12px_rgba(168,85,247,0.4)]"
             style={{ top: sectionPositions[index].buttonTop }}
             aria-label={`Fix issues for ${section.title}`}
           >

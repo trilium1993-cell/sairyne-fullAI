@@ -51,7 +51,7 @@ export const AnalysingChannels = ({ onCancelAnalysis, onClose }: AnalysingChanne
 
       <button 
         onClick={onCancelAnalysis}
-        className="flex w-[318px] h-10 items-center justify-center gap-2.5 px-2.5 py-[7px] absolute top-[734px] left-[calc(50.00%_-_158px)] rounded-[36px] border border-solid border-[#ffffff24] cursor-pointer">
+        className="flex w-[318px] h-10 items-center justify-center gap-2.5 px-2.5 py-[7px] absolute top-[734px] left-[calc(50.00%_-_158px)] rounded-[36px] border border-solid border-[#ffffff24] cursor-pointer transition-all duration-300 hover:bg-[linear-gradient(134deg,rgba(115,34,182,0.2)_0%,rgba(83,12,141,0.2)_100%)] hover:border-[#a855f7] hover:shadow-[0_0_12px_rgba(168,85,247,0.4)]">
         <img
           className="relative w-3.5 h-3.5"
           alt=""

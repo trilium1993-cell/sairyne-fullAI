@@ -25,18 +25,36 @@ Visit [http://localhost:5173](http://localhost:5173)
 
 ## 📚 Documentation
 
+### For Developers
 - **[Full Project Documentation](./PROJECT_README.md)** - Complete guide
 - **[Backend Integration](./BACKEND_INTEGRATION.md)** - API documentation
 - **[JUCE Integration](./JUCE_INTEGRATION_CHECKLIST.md)** - Audio engine guide
+
+### For Backend Team
+- **[Backend Specification (MVP)](./BACKEND_SPEC_MVP.md)** - Complete API spec with OpenAI integration
+- **[Frontend Changes](./FRONTEND_CHANGES.md)** - Required frontend modifications
+- **[AI Prompts](./AI_PROMPTS.md)** - OpenAI prompt engineering guide
+
+### For Audio Engineer
+- **[JUCE Plugin Spec (Phase 1)](./JUCE_PLUGIN_SPEC_PHASE1.md)** - WebView plugin implementation guide
+- **[JUCE Integration Checklist](./JUCE_INTEGRATION_CHECKLIST.md)** - FFT audio engine integration (Phase 2)
 
 ---
 
 ## 🛠️ Tech Stack
 
+### Frontend
 - React 18 + TypeScript
 - Vite 6.0
 - Tailwind CSS
-- JUCE 8 (Audio Engine)
+
+### Backend (in development)
+- Node.js + Express
+- OpenAI GPT-4 API
+- PostgreSQL (optional)
+
+### Plugin
+- JUCE 8 (Audio Engine + WebView wrapper)
 
 ---
 
@@ -65,12 +83,21 @@ src/
 
 ## 📝 Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Copy `env.example` to `.env.local` for local development:
 
 ```bash
-VITE_API_BASE_URL=https://api.sairyne.com
-VITE_ENVIRONMENT=development
+# Frontend
+VITE_API_URL=http://localhost:3001
+
+# Backend (for backend team)
+OPENAI_API_KEY=sk-...your-key-here
+PORT=3001
+
+# JUCE Plugin (for audio engineer)
+JUCE_WEBVIEW_URL=http://localhost:5173
 ```
+
+See `env.example` for complete configuration options.
 
 ---
 

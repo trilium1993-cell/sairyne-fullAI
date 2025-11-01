@@ -1,16 +1,21 @@
 import { useState, useRef } from "react";
+import { BackToProjectsConfirmation } from "../BackToProjectsConfirmation";
 
 interface FrameProps {
   projectName?: string;
   currentStep?: number;
   totalSteps?: number;
   completedSteps?: number;
+  onBackToProjects?: () => void;
 }
 
-export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps = 7, completedSteps = 0 }: FrameProps): JSX.Element => {
+export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps = 7, completedSteps = 0, onBackToProjects }: FrameProps): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const [isStepsDropdownOpen, setIsStepsDropdownOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [leftArrowHover, setLeftArrowHover] = useState(false);
+  const [rightArrowHover, setRightArrowHover] = useState(false);
+  const [showBackConfirmation, setShowBackConfirmation] = useState(false);
   const stepsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Функция для плавного закрытия выпадающего окна
@@ -20,6 +25,18 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
       setIsStepsDropdownOpen(false);
       setIsClosing(false);
     }, 500); // Время анимации
+  };
+
+  // Обработчик клика на левый треугольник
+  const handleBackToProjectsClick = () => {
+    setShowBackConfirmation(true);
+  };
+
+  // Подтверждение возврата к проектам
+  const handleConfirmBackToProjects = () => {
+    if (onBackToProjects) {
+      onBackToProjects();
+    }
   };
 
   // Шаги из Chat5.1
@@ -65,58 +82,16 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
             backgroundColor: 'black',
             zIndex: 0
           }} />
-              {/* Header - точно как в Chat5.1 */}
+              {/* Header - Progress window */}
               <header className="relative z-10">
-                <h1 className="absolute top-2.5 left-3 [font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-                  {projectName}
+                <h1 className="absolute top-2.5 left-3 [font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
+                  Progress window
                 </h1>
-
-                <img
-                  className="absolute top-[17px] left-[92px] w-[9px] h-[5px]"
-                  alt=""
-                  src="https://c.animaapp.com/Pqm9zsUr/img/polygon-1.svg"
-                  aria-hidden="true"
-                />
 
                 <img
                   className="top-[39px] left-[calc(50.00%_-_188px)] w-[377px] h-px absolute object-cover"
                   alt=""
                   src="https://c.animaapp.com/Pqm9zsUr/img/line-21.svg"
-                  aria-hidden="true"
-                />
-
-                <button
-                  className="absolute top-1.5 left-[343px] w-[26px] h-[26px]"
-                  aria-label="Close project setup"
-                  type="button"
-                  onClick={() => setIsStepsDropdownOpen(false)}
-                >
-                  <img
-                    alt=""
-                    src="https://c.animaapp.com/Pqm9zsUr/img/frame-16715.svg"
-                    aria-hidden="true"
-                  />
-                </button>
-
-                <div className="top-3 left-[143px] font-light text-xs leading-[normal] absolute [font-family:'DM_Sans',Helvetica] text-white tracking-[0]">
-                  Steps
-                </div>
-
-                <div className="absolute top-3 left-[181px] [font-family:'DM_Sans',Helvetica] font-normal text-[#888888] text-xs tracking-[0] leading-[normal]">
-                  {completedSteps}/{totalSteps}
-                </div>
-
-                <img
-                  className="absolute top-[13px] left-[121px] w-[15px] h-[13px]"
-                  alt=""
-                  src="https://c.animaapp.com/Pqm9zsUr/img/list-check-1.svg"
-                  aria-hidden="true"
-                />
-
-                <img
-                  className="top-3.5 left-[110px] w-px h-3 absolute object-cover"
-                  alt=""
-                  src="https://c.animaapp.com/Pqm9zsUr/img/line-28.svg"
                   aria-hidden="true"
                 />
               </header>
@@ -173,8 +148,8 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
 
                 <ol className="relative" role="list">
                   {steps.map((step, index) => {
-                    // Уменьшенные отступы между строками (было 37px, стало 30px)
-                    const topPosition = 148 + index * 30;
+                    // Уменьшенные отступы между строками
+                    const topPosition = 148 + index * 32;
 
                     return (
                       <li key={step.id} className="relative">
@@ -188,15 +163,15 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                           />
                         ) : (
                           <div
-                            className="absolute left-3 w-5 h-5 flex items-center justify-center rounded-[60px] overflow-hidden border border-solid border-[#e8e8e81f]"
+                            className="absolute left-3 w-5 h-5 rounded-[60px] border border-solid border-[#e8e8e81f]"
                             style={{ top: `${topPosition}px` }}
                             aria-hidden="true"
                           >
-                            <div
-                              className={`${step.id === 3 ? "ml-[-3px]" : "-ml-0.5"} -mt-0.5 h-[18px] w-1.5 [font-family:'Inter',Helvetica] font-medium text-white text-[9px] text-center tracking-[0] leading-[18px] whitespace-nowrap`}
+                            <span
+                              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 [font-family:'Inter',Helvetica] font-medium text-white text-[9px] tracking-[0] leading-none"
                             >
                               {step.id}
-                            </div>
+                            </span>
                           </div>
                         )}
 
@@ -210,7 +185,7 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                         {index < steps.length - 1 && (
                           <img
                             className="w-[calc(100%_-_26px)] left-3.5 h-px absolute object-cover"
-                            style={{ top: `${topPosition + 22}px` }}
+                            style={{ top: `${topPosition + 24}px` }}
                             alt=""
                             src="https://c.animaapp.com/Pqm9zsUr/img/line-14.svg"
                             aria-hidden="true"
@@ -225,7 +200,7 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
               {/* Hide Progress Button - точно как в Chat5.1 */}
               <footer className="relative z-10">
                 <button
-                  className="flex w-[377px] h-8 px-3 py-1.5 top-[410px] left-0 bg-[#ffffff05] border-[0.6px] border-solid border-[#ffffff21] items-center justify-center absolute"
+                  className="flex w-[377px] h-8 px-3 py-1.5 top-[372px] left-0 bg-[#ffffff05] border-[0.6px] border-solid border-[#ffffff21] items-center justify-center absolute"
                   type="button"
                   aria-expanded="true"
                   aria-label="Hide progress panel"
@@ -254,21 +229,60 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
         role="banner"
       >
         <div className="absolute top-2.5 left-[13px] flex items-center gap-2">
-          <button
-            className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] whitespace-nowrap [font-style:var(--body-font-style)] cursor-pointer flex items-center gap-2"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-expanded={isOpen}
-            aria-haspopup="true"
-            aria-label={`${projectName} dropdown menu`}
-          >
-            <span>{projectName}</span>
-            <img
-              className="w-[9px] h-[5px] pointer-events-none"
-              alt=""
-              src="https://c.animaapp.com/IeBsBV3O/img/polygon-1.svg"
-              aria-hidden="true"
-            />
-          </button>
+          <div className="flex items-center gap-1">
+            <div 
+              className="cursor-pointer -ml-2 p-[2px]"
+              onMouseEnter={() => {
+                setLeftArrowHover(true);
+              }}
+              onMouseLeave={() => {
+                setLeftArrowHover(false);
+              }}
+              onClick={handleBackToProjectsClick}
+            >
+              <img
+                className="w-[14px] h-[8px] pointer-events-none"
+                style={{
+                  transform: 'rotate(90deg)',
+                  opacity: leftArrowHover ? 1 : 0.6,
+                  filter: leftArrowHover ? 'brightness(8) contrast(2) saturate(0)' : 'none'
+                }}
+                alt=""
+                src="https://c.animaapp.com/IeBsBV3O/img/polygon-1.svg"
+                aria-hidden="true"
+              />
+            </div>
+            <button
+              className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] cursor-pointer max-w-[140px] truncate"
+              onClick={() => setIsOpen(!isOpen)}
+              aria-expanded={isOpen}
+              aria-haspopup="true"
+              aria-label={`${projectName} dropdown menu`}
+              title={projectName}
+            >
+              {projectName}
+            </button>
+            <div 
+              className="cursor-pointer p-[2px]"
+              onMouseEnter={() => {
+                setRightArrowHover(true);
+              }}
+              onMouseLeave={() => {
+                setRightArrowHover(false);
+              }}
+            >
+              <img
+                className="w-[14px] h-[8px] pointer-events-none"
+                style={{
+                  opacity: rightArrowHover ? 1 : 0.6,
+                  filter: rightArrowHover ? 'brightness(8) contrast(2) saturate(0)' : 'none'
+                }}
+                alt=""
+                src="https://c.animaapp.com/IeBsBV3O/img/polygon-1.svg"
+                aria-hidden="true"
+              />
+            </div>
+          </div>
           
           {/* Steps indicator with icon - для Chat5 */}
           <div className="flex items-center gap-1 relative">
@@ -313,6 +327,13 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
           />
         </button>
       </header>
+
+      {/* Confirmation Modal */}
+      <BackToProjectsConfirmation
+        isVisible={showBackConfirmation}
+        onClose={() => setShowBackConfirmation(false)}
+        onConfirm={handleConfirmBackToProjects}
+      />
     </div>
   );
 };

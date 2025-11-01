@@ -204,13 +204,15 @@ export const Chat1 = ({ onNext }: Chat1Props): JSX.Element => {
         </div>
 
         {/* Поле ввода сообщения */}
-        <div className="absolute bottom-[10px] left-[10px] w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px]">
+        <div className={`absolute bottom-[10px] left-[10px] w-[357px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-300 ${
+          message ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''
+        }`}>
           <input
             type="text"
             value={message}
             onChange={handleMessageChange}
             placeholder="Message..."
-            className="absolute top-[10px] left-[12px] text-[#ffffff6b] bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
+            className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
             style={{ 
               width: 'calc(100% - 100px)',
               fontFamily: 'var(--body-font-family)',
@@ -222,12 +224,36 @@ export const Chat1 = ({ onNext }: Chat1Props): JSX.Element => {
             }}
           />
 
-          <img
-            className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer"
-            alt="Send"
-            src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
-            onClick={handleSendMessage}
-          />
+          {message ? (
+            <button
+              className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] flex items-center justify-center rounded-md cursor-pointer transition-all duration-300 ease-out bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110"
+              style={{
+                transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+              type="button"
+              aria-label="Send message"
+              onClick={handleSendMessage}
+            >
+              <img
+                className="w-[28px] h-[28px]"
+                alt="Send"
+                src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                style={{
+                  filter: 'brightness(0) invert(1)'
+                }}
+              />
+            </button>
+          ) : (
+            <img
+              className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80"
+              style={{
+                transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+              alt="Send"
+              src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+              onClick={handleSendMessage}
+            />
+          )}
 
           <button
             onClick={handleAnalyze}
