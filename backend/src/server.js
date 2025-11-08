@@ -5,7 +5,7 @@ import OpenAI from 'openai';
 
 // Load environment variables
 dotenv.config();
-
+console.log("🌀 Sairyne backend restarting — fresh CORS build");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -17,34 +17,36 @@ console.log('  PORT:', PORT);
 
 // Middleware
 const allowedOrigins = [
-  // New domains
-  'https://sairyne-full-ai-78se.vercel.app',
-  'https://www.sairyne-full-ai-78se.vercel.app',
-  // Old domains kept for compatibility
-  'https://sairyne-full-ai-ujun.vercel.app',
-  'https://www.sairyne-full-ai-ujun.vercel.app',
-  // Local development
+  'https://sairyne-ai.vercel.app',
+  'https://www.sairyne-ai.vercel.app',
+  'https://sairyne-full5.onrender.com',
+  'http://localhost:3000',
   'http://localhost:5173'
 ];
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin like mobile apps or curl
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('Not allowed by CORS'));
+    console.log('🌐 Incoming request Origin:', origin);
+    if (!origin) return callback(null, true); // Allow no-origin (JUCE, curl, internal)
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) return callback(null, true);
+    console.warn('❌ Blocked by CORS:', origin);
+    return callback(null, false); // Do not throw to avoid 500 on preflight
   },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
   credentials: true,
-  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
-// Handle preflight for all routes
 app.options('*', cors(corsOptions));
 app.use(express.json());
+
+// Lightweight test endpoint
+app.get('/api/test', (req, res) => {
+  res.json({ status: 'ok', origin: req.headers.origin || 'none' });
+});
 
 // Initialize OpenAI
 if (!process.env.OPENAI_API_KEY) {
@@ -150,7 +152,7 @@ app.post('/api/chat/message', async (req, res) => {
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`✅ CORS enabled for: ${process.env.CORS_ORIGIN || 'http://localhost:5173'}`);
+  console.log(`✅ Allowed origins: ${[...allowedOrigins, process.env.CORS_ORIGIN].filter(Boolean).join(', ')}`);
   console.log(`🤖 OpenAI API key: ${process.env.OPENAI_API_KEY ? 'Configured ✅' : 'Missing ❌'}`);
 });
 
