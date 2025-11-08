@@ -7,7 +7,7 @@ import OpenAI from 'openai';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // Debug: Log environment variables (remove in production)
 console.log('🔍 Environment Check:');
@@ -16,12 +16,34 @@ console.log('  CORS_ORIGIN:', process.env.CORS_ORIGIN || 'http://localhost:5173 
 console.log('  PORT:', PORT);
 
 // Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+const allowedOrigins = [
+  // New domains
+  'https://sairyne-full-ai-78se.vercel.app',
+  'https://www.sairyne-full-ai-78se.vercel.app',
+  // Old domains kept for compatibility
+  'https://sairyne-full-ai-ujun.vercel.app',
+  'https://www.sairyne-full-ai-ujun.vercel.app',
+  // Local development
+  'http://localhost:5173'
+];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin like mobile apps or curl
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type']
-}));
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+// Handle preflight for all routes
+app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Initialize OpenAI
@@ -57,9 +79,13 @@ Topics you excel at:
 - MIDI and audio recording
 - Ableton-specific features (racks, groups, automation)`;
 
-// Health check endpoint
+// Health check endpoints
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Backend is running' });
+});
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true, backend: 'ready' });
 });
 
 // Chat endpoint

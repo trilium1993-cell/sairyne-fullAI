@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sairyne Embed Chat</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <style>
+      html, body, #app {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* no outer scroll */
+        background: #0b0b0f;
+        overscroll-behavior: none;
+      }
+      /* Force root app to fill the viewport without side gaps */
+      #app { display: block; }
+      #app > * { width: 100vw; max-width: 100vw; height: 100vh; overflow: hidden; }
+      /* Make common chat container scroll internally if present */
+      .chat-container, [data-chat-container] {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+    </style>
+    <link href="tailwind.css" rel="stylesheet" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- Reuse main entry; CSS above constrains layout -->
+    <script type="module" src="./src/index.tsx"></script>
+  </body>
+</html>
+
+

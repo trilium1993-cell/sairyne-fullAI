@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => ({
         main: './index.html',
         'visual-tips': './visual-tips.html',
         'chat-visual-tips-2': './chat-visual-tips-2.html',
-        'split-chat': './split-chat.html'
+        'split-chat': './split-chat.html',
+        'embed-chat': './embed-chat.html'
       },
       output: {
         // Инлайн маленьких assets для WebView

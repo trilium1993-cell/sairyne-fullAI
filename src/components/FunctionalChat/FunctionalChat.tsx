@@ -458,6 +458,16 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
     }
   }, [messages, showOptions, showGenres, showReadyButton, showStepContent, showCompletedStep, isTogglingVisualTips]);
 
+  // Notify host (JUCE wrapper) about expanded state for Visual Tips / Analysis
+  useEffect(() => {
+    const expanded = (showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary) ? '1' : '0';
+    try {
+      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+        window.parent.postMessage(`sairyne:resize:${expanded}`, '*');
+      }
+    } catch {}
+  }, [showVisualTips, showProjectAnalysis, showAnalysingChannels, showAnalysisSummary]);
+
   // Сохраняем позицию скролла при изменении showVisualTips
   useLayoutEffect(() => {
     if (isTogglingVisualTips && chatContainerRef.current) {
