@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #0b0b0f;
+    color: #ffffff;
+    overscroll-behavior: none;
+  }
+
+  #app {
+    min-height: 100vh;
+    width: 100vw;
+    max-width: 100vw;
+    overflow: hidden;
+    display: block;
+  }
+
+  #app > * {
+    width: 100vw;
+    max-width: 100vw;
+    min-height: 100vh;
+  }
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
