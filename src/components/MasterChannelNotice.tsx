@@ -20,7 +20,10 @@ export function MasterChannelNotice(): JSX.Element | null {
 
     setIsEmbedded(embedded);
     
-    if (!embedded) {
+    // Show notice for embedded or on production embed-chat page
+    const shouldShowNotice = embedded || window.location.pathname?.toLowerCase().includes("embed-chat");
+    
+    if (!shouldShowNotice) {
       return;
     }
 
@@ -47,7 +50,7 @@ export function MasterChannelNotice(): JSX.Element | null {
     }
   };
 
-  if (!visible || !isEmbedded) {
+  if (!visible) {
     return null;
   }
 
