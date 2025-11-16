@@ -68,23 +68,23 @@ export function MasterChannelNotice(): JSX.Element | null {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[1200] flex w-full max-w-[460px] -translate-x-1/2 justify-center px-4">
-      <div className="pointer-events-auto w-full rounded-2xl border border-white/10 bg-[#1f1b2e] px-5 py-4 shadow-xl shadow-black/40">
-        <div className="flex items-start gap-3">
+    <div className="pointer-events-none fixed bottom-6 left-1/2 z-[1200] flex -translate-x-1/2 justify-center" style={{ maxWidth: '340px', width: 'calc(100% - 20px)' }}>
+      <div className="pointer-events-auto w-full rounded-2xl border border-white/10 bg-[#1f1b2e] px-4 py-3 shadow-xl shadow-black/40">
+        <div className="flex items-start gap-2">
           <div className="mt-1 h-3 w-3 flex-shrink-0 rounded-full bg-[#ffb347]" />
-          <div className="flex-1 text-left text-sm text-white/85">
-            <p className="font-medium text-white">
+          <div className="flex-1 text-left">
+            <p className="font-medium text-white text-xs">
               Tip: place Sairyne on the Master bus
             </p>
-            <p className="mt-1 text-xs text-white/70">
-              Sairyne works on any track, but you get the most accurate analysis from the Master channel mixdown.
+            <p className="mt-1 text-xs text-white/70 leading-tight">
+              Works best on Master channel for accurate analysis.
             </p>
           </div>
         </div>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-3 flex justify-end">
           <button
             onClick={handleDismiss}
-            className="rounded-md bg-gradient-to-r from-[#7322b6] to-[#530c8d] px-3.5 py-1.5 text-xs font-semibold text-white transition-transform hover:scale-[1.02]"
+            className="rounded-md bg-gradient-to-r from-[#7322b6] to-[#530c8d] px-3 py-1.5 text-xs font-semibold text-white transition-transform hover:scale-[1.02]"
           >
             I understand
           </button>
