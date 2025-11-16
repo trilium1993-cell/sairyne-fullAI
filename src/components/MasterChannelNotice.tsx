@@ -11,6 +11,8 @@ export function MasterChannelNotice(): JSX.Element | null {
       return;
     }
 
+    console.log('[MasterChannelNotice] Initializing, pathname:', window.location.pathname);
+
     // Check if embedded - try multiple methods for WebView compatibility
     const embedded = 
       document.body?.dataset.embed === "true" ||
@@ -18,23 +20,34 @@ export function MasterChannelNotice(): JSX.Element | null {
       window.location.pathname?.toLowerCase().includes("embed-chat") ||
       window.location.search?.toLowerCase().includes("embed=1");
 
+    console.log('[MasterChannelNotice] Embedded check:', embedded);
     setIsEmbedded(embedded);
     
-    // Show notice for embedded or on production embed-chat page
-    const shouldShowNotice = embedded || window.location.pathname?.toLowerCase().includes("embed-chat");
+    // Show notice for embedded or on any page (not restricted to embed-chat)
+    const shouldShowNotice = true; // Always show on embedded pages
     
     if (!shouldShowNotice) {
+      console.log('[MasterChannelNotice] shouldShowNotice is false, not showing');
       return;
     }
 
-    // Check localStorage with error handling
+    console.log('[MasterChannelNotice] Checking localStorage...');
+    
+    // Check localStorage with error handling - if already dismissed, don't show
     try {
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored !== "1") {
-        setVisible(true);
+      console.log('[MasterChannelNotice] Storage value:', stored);
+      
+      if (stored === "1") {
+        console.log('[MasterChannelNotice] Already dismissed, not showing');
+        return;
       }
+      
+      console.log('[MasterChannelNotice] Showing notice');
+      setVisible(true);
     } catch (error) {
       // If localStorage is blocked, show the notice anyway
+      console.log('[MasterChannelNotice] localStorage error, showing anyway:', error);
       setVisible(true);
     }
   }, []);
