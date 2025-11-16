@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Window } from "../../components/Window";
+import { createSession, findUserByEmail, getCurrentUser } from "../../services/auth";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
 
 interface SignInProps {
@@ -8,8 +9,15 @@ interface SignInProps {
 }
 
 export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
-  const [email, setEmail] = useState("");
+  const existingUser = typeof window !== "undefined" ? getCurrentUser() : null;
+  const [email, setEmail] = useState(existingUser?.email ?? "");
   const [password, setPassword] = useState("");
+  useEffect(() => {
+    const user = typeof window !== "undefined" ? getCurrentUser() : null;
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, []);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -35,42 +43,20 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       return;
     }
 
-    // Сохраняем пользователя в localStorage
-    try {
-      const userData = {
-        email: email.trim(),
-        password: password, // В реальном приложении пароль должен быть зашифрован
-        loginTime: new Date().toISOString(),
-        id: Date.now()
-      };
-
-      // Получаем существующих пользователей
-      const existingUsers = JSON.parse(localStorage.getItem('sairyne_users') || '[]');
-      
-      // Проверяем, есть ли уже такой пользователь
-      const existingUser = existingUsers.find((user: any) => user.email === email.trim());
-      
-      if (existingUser) {
-        // Обновляем время входа
-        existingUser.loginTime = new Date().toISOString();
-        const updatedUsers = existingUsers.map((user: any) => 
-          user.email === email.trim() ? existingUser : user
-        );
-        localStorage.setItem('sairyne_users', JSON.stringify(updatedUsers));
-      } else {
-        // Добавляем нового пользователя
-        existingUsers.push(userData);
-        localStorage.setItem('sairyne_users', JSON.stringify(existingUsers));
-      }
-
-      // Сохраняем текущего пользователя
-      localStorage.setItem('sairyne_current_user', JSON.stringify(userData));
-      
-    } catch (error) {
-      // В случае ошибки все равно переходим дальше
+    const userRecord = findUserByEmail(email.trim());
+    if (userRecord && userRecord.password !== password) {
+      setErrorMessage("Incorrect password. Please try again.");
+      setShowError(true);
+      return;
     }
 
-    // If validation passes, go to next screen
+    const session = createSession(email, password);
+    if (!session.success) {
+      setErrorMessage(session.error || "Unable to sign in. Please try again.");
+      setShowError(true);
+      return;
+    }
+
     onNext();
   };
 
@@ -86,7 +72,7 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleSignUp = () => {
-    window.open('https://sairyne.com', '_blank');
+    window.open('https://www.sairyne.net', '_blank');
   };
 
   const closeError = () => {

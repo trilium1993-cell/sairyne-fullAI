@@ -3,6 +3,7 @@ import { Frame } from "../../components/Frame";
 import { ChatMessage } from "../../components/ChatMessage";
 import { ChatButton } from "../../components/ChatButton";
 import { useTypingAnimation } from "../../hooks/useTypingAnimation";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
 
 interface Chat5Props {
   onNext: () => void;
@@ -29,16 +30,16 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
 
   // Получаем название проекта из localStorage
   useEffect(() => {
-    const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-    if (selectedProjectData) {
-      const selectedProject = JSON.parse(selectedProjectData);
+    const selectedProject = getSelectedProject();
+    if (selectedProject) {
       setProjectName(selectedProject.name);
-    } else {
-      const savedProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      if (savedProjects.length > 0) {
-        const lastProject = savedProjects[savedProjects.length - 1];
-        setProjectName(lastProject.name);
-      }
+      return;
+    }
+
+    const latestProject = getLatestProject();
+    if (latestProject) {
+      setSelectedProject(latestProject);
+      setProjectName(latestProject.name);
     }
   }, []);
 
@@ -81,7 +82,9 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
 
   const handleSendMessage = () => {
     if (message.trim()) {
-      console.log("Sending message:", message);
+      if (import.meta.env.DEV) {
+        console.debug('[chat5] send', message);
+      }
       setMessage("");
       onNext();
     }
@@ -94,7 +97,9 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
   };
 
   const handleAnalyze = () => {
-    console.log("Analyze clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat5] analyze');
+    }
   };
 
   const handleLearn = () => {
@@ -102,7 +107,9 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
   };
 
   const handleReadyClick = () => {
-    console.log("Ready button clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat5] ready');
+    }
     setMessage("I'm ready! Let's start!");
     setTimeout(() => {
       onNext();
@@ -110,7 +117,9 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
   };
 
   const handleShowVisualTips = () => {
-    console.log("Show visual tips clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat5] visual tips toggle');
+    }
   };
 
 
@@ -134,23 +143,8 @@ export const Chat5 = ({ onNext, onBack }: Chat5Props): JSX.Element => {
       className="relative w-[383px] h-[847px] bg-[#413f42] rounded-[10px] overflow-hidden"
       data-model-id="337:2297"
     >
-      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 flex items-center justify-between px-3 h-5">
-        <h1 className="[font-family:'Inter',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-          Sairyne
-        </h1>
+      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 h-[10px] bg-[#14141447]">
       </header>
-
-      <img
-        className="absolute top-[calc(50.00%_-_418px)] right-[13px] w-4 h-4"
-        alt="Close"
-        src="https://c.animaapp.com/bDY1idTn/img/close-1.svg"
-      />
-
-      <img
-        className="absolute top-[calc(50.00%_-_418px)] right-[41px] w-4 h-4"
-        alt="Arrows in simple"
-        src="https://c.animaapp.com/bDY1idTn/img/arrows-in-simple-light-1.svg"
-      />
 
       <main className="absolute top-[34px] left-[3px] w-[377px] h-[810px] bg-[#141414] rounded-[7px] overflow-hidden">
         {/* Project Header */}

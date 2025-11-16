@@ -10,29 +10,31 @@ export const ProjectAnalysis = ({ onStartAnalysis, onClose }: ProjectAnalysisPro
   return (
     <div className="w-full h-full relative">
       {/* Project Analysis Header */}
-      <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
-        {/* Close button in left corner */}
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
-            aria-label="Close project analysis"
-          >
-            <img
-              className="w-[14px] h-[14px]"
-              alt="Close"
-              src={closeIcon}
-            />
-          </button>
-        )}
-        
-        <h2 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
-          Project Analysis
-        </h2>
-      </div>
+      <header className="absolute top-0 left-0 w-[383px] h-10 bg-[#14141447] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)]">
+        <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
+          {/* Close button in left corner */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
+              aria-label="Close project analysis"
+            >
+              <img
+                className="w-[14px] h-[14px]"
+                alt="Close"
+                src={closeIcon}
+              />
+            </button>
+          )}
+          
+          <h2 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
+            Project Analysis
+          </h2>
+        </div>
 
-      {/* Horizontal line under header */}
-      <div className="absolute top-[39px] left-0 w-[383px] h-[1px] bg-white/10" />
+        {/* Horizontal line under header */}
+        <div className="absolute top-[39px] left-0 w-[383px] h-[1px] bg-white/10" />
+      </header>
 
       {/* Audio waveform visualization */}
       <img

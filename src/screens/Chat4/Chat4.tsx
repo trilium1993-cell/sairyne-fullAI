@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Frame } from "../../components/Frame";
 import { ChatMessage } from "../../components/ChatMessage";
 import { ChatButton } from "../../components/ChatButton";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
 
 interface Chat4Props {
   onNext: () => void;
@@ -27,18 +28,16 @@ export const Chat4 = ({ onNext }: Chat4Props): JSX.Element => {
 
   // Получаем название проекта из localStorage
   useEffect(() => {
-    // Сначала проверяем выбранный проект
-    const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-    if (selectedProjectData) {
-      const selectedProject = JSON.parse(selectedProjectData);
+    const selectedProject = getSelectedProject();
+    if (selectedProject) {
       setProjectName(selectedProject.name);
-    } else {
-      // Если нет выбранного, берем последний созданный
-      const savedProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      if (savedProjects.length > 0) {
-        const lastProject = savedProjects[savedProjects.length - 1];
-        setProjectName(lastProject.name);
-      }
+      return;
+    }
+
+    const latestProject = getLatestProject();
+    if (latestProject) {
+      setSelectedProject(latestProject);
+      setProjectName(latestProject.name);
     }
   }, []);
 
@@ -89,22 +88,30 @@ export const Chat4 = ({ onNext }: Chat4Props): JSX.Element => {
 
   const handleSendMessage = () => {
     if (message.trim()) {
-      console.log("Sending message:", message);
+      if (import.meta.env.DEV) {
+        console.debug('[chat4] send', message);
+      }
       setMessage("");
       onNext();
     }
   };
 
   const handleAnalyze = () => {
-    console.log("Analyze clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat4] analyze');
+    }
   };
 
   const handleLearn = () => {
-    console.log("Learn clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat4] learn');
+    }
   };
 
   const handleReadyClick = () => {
-    console.log("Ready button clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chat4] ready');
+    }
     setMessage("I'm ready! Let's start!");
     setShowReadyButton(false);
   };
@@ -122,10 +129,7 @@ export const Chat4 = ({ onNext }: Chat4Props): JSX.Element => {
       className="relative w-[383px] h-[847px] bg-[#413f42] rounded-[10px] overflow-hidden"
       data-model-id="337:2223"
     >
-      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 flex items-center justify-between px-3 h-5">
-        <h1 className="[font-family:'Inter',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-          Sairyne
-        </h1>
+      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 h-[10px] bg-[#14141447]">
       </header>
 
       <main className="absolute top-[34px] left-[3px] w-[377px] h-[810px] bg-[#141414] rounded-[7px] overflow-hidden">

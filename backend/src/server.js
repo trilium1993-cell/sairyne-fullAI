@@ -5,15 +5,21 @@ import OpenAI from 'openai';
 
 // Load environment variables
 dotenv.config();
-console.log("🌀 Sairyne backend restarting — fresh CORS build");
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+if (isDevelopment) {
+  console.log("🌀 Sairyne backend restarting — fresh CORS build");
+}
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Debug: Log environment variables (remove in production)
-console.log('🔍 Environment Check:');
-console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING');
-console.log('  CORS_ORIGIN:', process.env.CORS_ORIGIN || 'http://localhost:5173 (default)');
-console.log('  PORT:', PORT);
+// Debug: Log environment variables (development only)
+if (isDevelopment) {
+  console.log('🔍 Environment Check:');
+  console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING');
+  console.log('  CORS_ORIGIN:', process.env.CORS_ORIGIN || 'http://localhost:5173 (default)');
+  console.log('  PORT:', PORT);
+}
 
 // Middleware
 const allowedOrigins = [
@@ -26,11 +32,15 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    console.log('🌐 Incoming request Origin:', origin);
+    if (isDevelopment) {
+      console.log('🌐 Incoming request Origin:', origin);
+    }
     if (!origin) return callback(null, true); // Allow no-origin (JUCE, curl, internal)
     if (allowedOrigins.includes(origin)) return callback(null, true);
     if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) return callback(null, true);
-    console.warn('❌ Blocked by CORS:', origin);
+    if (isDevelopment) {
+      console.warn('❌ Blocked by CORS:', origin);
+    }
     return callback(null, false); // Do not throw to avoid 500 on preflight
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -48,15 +58,15 @@ app.get('/api/test', (req, res) => {
   res.json({ status: 'ok', origin: req.headers.origin || 'none' });
 });
 
-// Initialize OpenAI
-if (!process.env.OPENAI_API_KEY) {
-  console.error('❌ CRITICAL: OPENAI_API_KEY environment variable is not set!');
-  console.error('Please add OPENAI_API_KEY to your Railway environment variables.');
+const openaiApiKey = process.env.OPENAI_API_KEY;
+
+if (!openaiApiKey && isDevelopment) {
+  console.error('❌ CRITICAL: OPENAI_API_KEY environment variable is not set! AI responses will be disabled.');
 }
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const openai = openaiApiKey
+  ? new OpenAI({ apiKey: openaiApiKey })
+  : null;
 
 // System prompt for Ableton expert
 const SYSTEM_PROMPT = `You are an expert Ableton Live music production assistant specializing in House music. 
@@ -90,6 +100,20 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, backend: 'ready' });
 });
 
+// Analytics endpoint (MVP stub)
+app.post('/analytics/event', (req, res) => {
+  const { name, payload = {}, timestamp } = req.body || {};
+  if (isDevelopment) {
+    console.log('📊 Analytics Event:', {
+      name,
+      receivedAt: new Date().toISOString(),
+      timestamp,
+      payload
+    });
+  }
+  res.status(202).json({ status: 'accepted' });
+});
+
 // Chat endpoint
 app.post('/api/chat/message', async (req, res) => {
   try {
@@ -97,6 +121,10 @@ app.post('/api/chat/message', async (req, res) => {
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
+    }
+
+    if (!openai) {
+      return res.status(503).json({ error: 'AI service temporarily unavailable. Please configure OPENAI_API_KEY.' });
     }
 
     // Build messages array for OpenAI
@@ -125,13 +153,15 @@ app.post('/api/chat/message', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('OpenAI API Error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      status: error.status,
-      code: error.code,
-      type: error.type
-    });
+    if (isDevelopment) {
+      console.error('OpenAI API Error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        type: error.type
+      });
+    }
     
     if (error.status === 401) {
       return res.status(401).json({ error: 'Invalid OpenAI API key' });
@@ -151,8 +181,10 @@ app.post('/api/chat/message', async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`✅ Allowed origins: ${[...allowedOrigins, process.env.CORS_ORIGIN].filter(Boolean).join(', ')}`);
-  console.log(`🤖 OpenAI API key: ${process.env.OPENAI_API_KEY ? 'Configured ✅' : 'Missing ❌'}`);
+  if (isDevelopment) {
+    console.log(`🚀 Backend server running on port ${PORT}`);
+    console.log(`✅ Allowed origins: ${[...allowedOrigins, process.env.CORS_ORIGIN].filter(Boolean).join(', ')}`);
+    console.log(`🤖 OpenAI API key: ${openaiApiKey ? 'Configured ✅' : 'Missing ❌'}`);
+  }
 });
 

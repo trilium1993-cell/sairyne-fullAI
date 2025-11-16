@@ -3,6 +3,30 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("./src/assets/fonts/DM-Sans-400.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("./src/assets/fonts/Inter-500.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: 'Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("./src/assets/fonts/Poppins-600.ttf") format("truetype");
+  }
+
   html,
   body {
     height: 100%;
@@ -25,6 +49,20 @@
     width: 100vw;
     max-width: 100vw;
     min-height: 100vh;
+  }
+
+  body[data-embed="true"] {
+    font-family: var(--body-font-family);
+    color: #f7efff;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body[data-embed="true"] button,
+  body[data-embed="true"] input,
+  body[data-embed="true"] textarea,
+  body[data-embed="true"] select {
+    font-family: var(--body-font-family);
   }
 }
 
@@ -74,6 +112,16 @@
   select,
   textarea {
     @apply appearance-none bg-transparent border-0 outline-none;
+  }
+
+  body[data-theme='light'] {
+    background: #f5f4ff;
+    color: #1f1333;
+  }
+
+  body[data-theme='light'] .sairyne-surface {
+    background: #f6f2ff;
+    color: #1f1333;
   }
 }
 
@@ -235,3 +283,4 @@
 .animate-fadeIn {
   animation: fadeIn 0.5s ease-out forwards;
 }
+

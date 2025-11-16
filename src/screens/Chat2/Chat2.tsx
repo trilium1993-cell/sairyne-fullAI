@@ -4,6 +4,7 @@ import { ChatMessage } from "../../components/ChatMessage";
 import { ChatButton } from "../../components/ChatButton";
 import { useTypingAnimation } from "../../hooks/useTypingAnimation";
 import "./chat2.css";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
 
 interface Chat2Props {
   onNext: () => void;
@@ -21,18 +22,16 @@ export const Chat2 = ({ onNext }: Chat2Props): JSX.Element => {
 
   // Получаем название проекта из localStorage
   useEffect(() => {
-    // Сначала проверяем выбранный проект
-    const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-    if (selectedProjectData) {
-      const selectedProject = JSON.parse(selectedProjectData);
+    const selectedProject = getSelectedProject();
+    if (selectedProject) {
       setProjectName(selectedProject.name);
-    } else {
-      // Если нет выбранного, берем последний созданный
-      const savedProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      if (savedProjects.length > 0) {
-        const lastProject = savedProjects[savedProjects.length - 1];
-        setProjectName(lastProject.name);
-      }
+      return;
+    }
+
+    const latestProject = getLatestProject();
+    if (latestProject) {
+      setSelectedProject(latestProject);
+      setProjectName(latestProject.name);
     }
   }, []);
 
@@ -59,7 +58,9 @@ export const Chat2 = ({ onNext }: Chat2Props): JSX.Element => {
   useEffect(() => {
     if (!showGenres) return;
     
-    console.log('Starting genre animation...');
+    if (import.meta.env.DEV) {
+      console.debug('[chat2] start genre animation');
+    }
     
     // Плавная анимация - показываем жанры поочередно с печатанием текста
     const genresList = ["House", "Techno", "Trance", "Drum & Bass"];
@@ -120,10 +121,7 @@ export const Chat2 = ({ onNext }: Chat2Props): JSX.Element => {
       className="relative w-[383px] h-[847px] bg-[#413f42] rounded-[10px] overflow-hidden"
       data-model-id="337:2152"
     >
-      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 flex items-center justify-between px-3 h-5">
-        <h1 className="[font-family:'Inter',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-          Sairyne
-        </h1>
+      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 h-[10px] bg-[#14141447]">
       </header>
 
       <main className="absolute top-[34px] left-[3px] w-[377px] h-[810px] bg-[#141414] rounded-[7px] overflow-hidden">

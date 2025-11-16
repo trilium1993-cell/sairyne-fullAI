@@ -230,11 +230,15 @@ export const ChatWindowNew = (): JSX.Element => {
   }, [handleSendClick]);
 
   const handleAnalyzeClick = useCallback(() => {
-    console.log("Analyze clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[splitChat] analyze');
+    }
   }, []);
 
   const handleLearnClick = useCallback(() => {
-    console.log("Learn clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[splitChat] learn');
+    }
   }, []);
 
   return (

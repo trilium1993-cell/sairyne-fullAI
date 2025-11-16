@@ -27,6 +27,7 @@ Required variables in Railway:
 OPENAI_API_KEY=sk-...your-openai-key
 PORT=3001
 CORS_ORIGIN=https://your-frontend.vercel.app
+FRONTEND_URL=https://your-frontend.vercel.app
 ```
 
 ### Health Check
@@ -40,6 +41,7 @@ curl https://your-backend.up.railway.app/api/health
 
 - `GET /api/health` - Health check
 - `POST /api/chat/message` - Send AI chat message
+- `POST /analytics/event` - Record lightweight analytics event (fire and forget)
 
 ## 🤖 OpenAI Integration
 

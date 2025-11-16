@@ -42,16 +42,22 @@ export const WelcomeToSairyne = ({ onNext, onBack }: WelcomeToSairyneProps): JSX
   };
 
   const handleStartClick = () => {
-    console.log("Let's start clicked", { dontShowAgain });
+    if (import.meta.env.DEV) {
+      console.debug('[welcome] start clicked', { dontShowAgain });
+    }
     onNext();
   };
 
   const handleCloseClick = () => {
-    console.log("Close clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[welcome] close clicked');
+    }
   };
 
   const handleMinimizeClick = () => {
-    console.log("Minimize clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[welcome] minimize clicked');
+    }
   };
 
   return (

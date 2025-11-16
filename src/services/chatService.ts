@@ -19,8 +19,11 @@ export class ChatService {
     conversationHistory: ChatMessage[] = []
   ): Promise<string> {
     try {
+      const isDev = import.meta.env.DEV;
       const url = `${API_URL}${API_ENDPOINTS.CHAT_MESSAGE}`;
-      console.log('🌐 Sending request to:', url);
+      if (isDev) {
+        console.debug('[chat] POST', url);
+      }
       
       const response = await fetch(url, {
         method: 'POST',
@@ -33,19 +36,27 @@ export class ChatService {
         }),
       });
 
-      console.log('📡 Response status:', response.status);
+      if (isDev) {
+        console.debug('[chat] status', response.status);
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('❌ API Error:', errorData);
+        if (isDev) {
+          console.error('[chat] error response', errorData);
+        }
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data: ChatResponse = await response.json();
-      console.log('✅ API Success:', data);
+      if (isDev) {
+        console.debug('[chat] success', data);
+      }
       return data.response;
     } catch (error) {
-      console.error('❌ Chat service error:', error);
+      if (import.meta.env.DEV) {
+        console.error('[chat] request failed', error);
+      }
       throw error;
     }
   }

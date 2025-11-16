@@ -12,8 +12,9 @@
  */
 export const API_URL = import.meta.env.VITE_API_URL || 'https://sairyne-full5.onrender.com';
 
-// Debug: Log API URL in all modes
-console.log('🔍 API_URL:', API_URL);
+if (import.meta.env.DEV) {
+  console.debug('[config] API_URL:', API_URL);
+}
 
 /**
  * API Endpoints

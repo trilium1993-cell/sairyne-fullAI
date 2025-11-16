@@ -13,8 +13,10 @@ export const VisualTips = ({ tipId, currentStep }: VisualTipsProps): JSX.Element
   // Step 2 of 7 — Drum Rack is at currentStep = 5
   const rawStep = Number(currentStep);
   const displayStep = rawStep === 4 ? 1 : 2; // Step 1 (id=4) or Step 2 (id=5)
-  
-  console.log("VisualTips rendered with currentStep:", currentStep, "displayStep:", displayStep);
+
+  if (import.meta.env.DEV) {
+    console.debug('[visualTips] render', { currentStep, displayStep, tipId });
+  }
 
   return (
     <div className="relative w-[383px] h-[810px] bg-[#141414] rounded-[7px] overflow-hidden">

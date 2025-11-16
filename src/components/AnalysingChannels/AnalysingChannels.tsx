@@ -10,34 +10,7 @@ export const AnalysingChannels = ({ onCancelAnalysis, onClose }: AnalysingChanne
   return (
     <div className="w-full h-full relative">
       {/* Project Analysis Header */}
-      <header className="absolute top-0 left-0 w-[383px] h-10 bg-[#14141447] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)]">
-        <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
-          {/* Close button in left corner */}
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
-              aria-label="Close analysis"
-            >
-              <img
-                className="w-[14px] h-[14px]"
-                alt="Close"
-                src={closeIcon}
-              />
-            </button>
-          )}
-          
-          <h1 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
-            Project Analysis
-          </h1>
-        </div>
-
-        <img
-          className="absolute top-[39px] left-[calc(50.00%_-_188px)] w-[383px] h-px object-cover"
-          alt=""
-          src="https://c.animaapp.com/WuobRfE5/img/line-21-1.svg"
-          aria-hidden="true"
-        />
+      <header className="absolute top-0 left-0 w-[383px] h-[10px] bg-[#14141447] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)]">
       </header>
 
       <p className="absolute top-[454px] left-[calc(50.00%_-_148px)] w-[297px] font-helper font-[number:var(--helper-font-weight)] text-[#ffffff8f] text-[length:var(--helper-font-size)] text-center tracking-[var(--helper-letter-spacing)] leading-[var(--helper-line-height)] [font-style:var(--helper-font-style)]">

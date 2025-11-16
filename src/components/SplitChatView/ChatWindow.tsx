@@ -245,11 +245,15 @@ export const ChatWindow = (): JSX.Element => {
   }, [handleSendClick]);
 
   const handleAnalyzeClick = useCallback(() => {
-    console.log("Analyze clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[splitChat-window] analyze');
+    }
   }, []);
 
   const handleLearnClick = useCallback(() => {
-    console.log("Learn clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[splitChat-window] learn');
+    }
   }, []);
 
   return (
@@ -327,7 +331,9 @@ export const ChatWindow = (): JSX.Element => {
             <ChatButton
               text={completedStepText}
               onClick={() => {
-                console.log("Completed. Next step clicked");
+                if (import.meta.env.DEV) {
+                  console.debug('[splitChat-window] completed step');
+                }
               }}
               variant="primary"
               className="w-fit animate-fadeIn"

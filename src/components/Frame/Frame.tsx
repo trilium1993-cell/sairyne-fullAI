@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, CSSProperties } from "react";
 import { BackToProjectsConfirmation } from "../BackToProjectsConfirmation";
+import { UserMenu } from "../UserMenu";
 
 interface FrameProps {
   projectName?: string;
@@ -9,6 +10,84 @@ interface FrameProps {
   onBackToProjects?: () => void;
 }
 
+const HorizontalRule = ({ className = "", style }: { className?: string; style?: CSSProperties }) => (
+  <div
+    className={`bg-white/10 ${className}`}
+    style={style}
+    role="separator"
+    aria-hidden="true"
+  />
+);
+
+const CheckCircleIcon = ({ className = "", style }: { className?: string; style?: CSSProperties }) => (
+  <svg
+    viewBox="0 0 20 20"
+    className={className}
+    style={style}
+    aria-hidden="true"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <circle cx="10" cy="10" r="9" fill="#5cba4f" opacity="0.15" />
+    <path
+      d="M8.699 12.9a1 1 0 0 1-1.414 0l-1.697-1.697a1 1 0 1 1 1.414-1.414l0.99.99 3.615-3.614a1 1 0 0 1 1.414 1.414l-4.322 4.321Z"
+      fill="#5cba4f"
+    />
+  </svg>
+);
+
+const CaretIcon = ({ className = "", style }: { className?: string; style?: CSSProperties }) => (
+  <svg
+    viewBox="0 0 12 8"
+    className={className}
+    style={style}
+    fill="currentColor"
+    aria-hidden="true"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path d="M10.59 1.59 6 6.17 1.41 1.59 0 3l6 6 6-6-1.41-1.41Z" />
+  </svg>
+);
+
+const ListCheckIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 20 20"
+    className={className}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <polyline points="5 5 7 7 11 3" />
+    <line x1="13" y1="5" x2="17" y2="5" />
+    <polyline points="5 11 7 13 11 9" />
+    <line x1="13" y1="11" x2="17" y2="11" />
+    <polyline points="5 17 7 19 11 15" />
+    <line x1="13" y1="17" x2="17" y2="17" />
+  </svg>
+);
+
+const UserBadgeIcon = ({ className = "" }: { className?: string }) => (
+  <svg
+    viewBox="0 0 28 28"
+    className={className}
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <circle cx="14" cy="14" r="13" fill="#1f2026" />
+    <circle cx="14" cy="11" r="4" fill="none" stroke="#d8d8dc" strokeWidth="1.4" />
+    <path
+      d="M8.8 21.2c0.9-2.4 3.2-4.1 5.2-4.1s4.3 1.7 5.2 4.1"
+      stroke="#d8d8dc"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+    <circle cx="14" cy="14" r="13" fill="none" stroke="#ffffff14" strokeWidth="1" />
+  </svg>
+);
+
 export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps = 7, completedSteps = 0, onBackToProjects }: FrameProps): JSX.Element => {
   const [isOpen, setIsOpen] = useState(false);
   const [isStepsDropdownOpen, setIsStepsDropdownOpen] = useState(false);
@@ -16,6 +95,7 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
   const [leftArrowHover, setLeftArrowHover] = useState(false);
   const [rightArrowHover, setRightArrowHover] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const stepsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Функция для плавного закрытия выпадающего окна
@@ -88,11 +168,9 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                   Progress window
                 </h1>
 
-                <img
-                  className="top-[39px] left-[calc(50.00%_-_188px)] w-[377px] h-px absolute object-cover"
-                  alt=""
-                  src="https://c.animaapp.com/Pqm9zsUr/img/line-21.svg"
-                  aria-hidden="true"
+                <HorizontalRule
+                  className="absolute w-[377px]"
+                  style={{ top: '39px', left: 'calc(50% - 188px)', height: '1px' }}
                 />
               </header>
 
@@ -128,11 +206,9 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                   </span>
                 </p>
 
-                <img
-                  className="w-[calc(100%_-_26px)] top-[105px] left-3 h-px absolute object-cover"
-                  alt=""
-                  src="https://c.animaapp.com/Pqm9zsUr/img/line-9.svg"
-                  aria-hidden="true"
+                <HorizontalRule
+                  className="absolute w-[calc(100%_-_26px)]"
+                  style={{ top: '105px', left: '12px', height: '1px' }}
                 />
               </section>
 
@@ -154,12 +230,9 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                     return (
                       <li key={step.id} className="relative">
                         {step.completed ? (
-                          <img
-                            className="absolute left-[13px] w-[18px] h-[18px]"
-                            style={{ top: `${topPosition}px` }}
-                            alt=""
-                            src="https://c.animaapp.com/Pqm9zsUr/img/check-circle-fill-4.svg"
-                            aria-hidden="true"
+                          <CheckCircleIcon
+                            className="absolute left-[13px]"
+                            style={{ top: `${topPosition}px`, width: '18px', height: '18px' }}
                           />
                         ) : (
                           <div
@@ -183,12 +256,9 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                         </div>
 
                         {index < steps.length - 1 && (
-                          <img
-                            className="w-[calc(100%_-_26px)] left-3.5 h-px absolute object-cover"
-                            style={{ top: `${topPosition + 24}px` }}
-                            alt=""
-                            src="https://c.animaapp.com/Pqm9zsUr/img/line-14.svg"
-                            aria-hidden="true"
+                          <HorizontalRule
+                            className="absolute w-[calc(100%_-_26px)]"
+                            style={{ top: `${topPosition + 24}px`, left: '14px', height: '1px' }}
                           />
                         )}
                       </li>
@@ -211,11 +281,9 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                       Hide progress
                     </span>
 
-                    <img
-                      className="absolute top-[7px] left-0 w-[9px] h-[5px]"
-                      alt=""
-                      src="https://c.animaapp.com/Pqm9zsUr/img/arrow-8--stroke-.svg"
-                      aria-hidden="true"
+                    <CaretIcon
+                      className="absolute w-[9px] h-[5px] text-white"
+                      style={{ top: '7px', left: 0, transform: 'rotate(180deg)', opacity: 0.7 }}
                     />
                   </div>
                 </button>
@@ -227,6 +295,7 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
         className="w-[377px] h-10 bg-[#14141447] relative"
         data-model-id="337:2961"
         role="banner"
+        style={{ border: 'none', boxShadow: 'none', outline: 'none' }}
       >
         <div className="absolute top-2.5 left-[13px] flex items-center gap-2">
           <div className="flex items-center gap-1">
@@ -240,28 +309,20 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
               }}
               onClick={handleBackToProjectsClick}
             >
-              <img
-                className="w-[14px] h-[8px] pointer-events-none"
+              <CaretIcon
+                className="w-[14px] h-[8px] text-white pointer-events-none"
                 style={{
                   transform: 'rotate(90deg)',
-                  opacity: leftArrowHover ? 1 : 0.6,
-                  filter: leftArrowHover ? 'brightness(8) contrast(2) saturate(0)' : 'none'
+                  opacity: leftArrowHover ? 1 : 0.6
                 }}
-                alt=""
-                src="https://c.animaapp.com/IeBsBV3O/img/polygon-1.svg"
-                aria-hidden="true"
               />
             </div>
-            <button
-              className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] cursor-pointer max-w-[140px] truncate"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-expanded={isOpen}
-              aria-haspopup="true"
-              aria-label={`${projectName} dropdown menu`}
+            <span
+              className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] max-w-[140px] truncate"
               title={projectName}
             >
               {projectName}
-            </button>
+            </span>
             <div 
               className="cursor-pointer p-[2px]"
               onMouseEnter={() => {
@@ -271,15 +332,12 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
                 setRightArrowHover(false);
               }}
             >
-              <img
-                className="w-[14px] h-[8px] pointer-events-none"
+              <CaretIcon
+                className="w-[14px] h-[8px] text-white pointer-events-none"
                 style={{
-                  opacity: rightArrowHover ? 1 : 0.6,
-                  filter: rightArrowHover ? 'brightness(8) contrast(2) saturate(0)' : 'none'
+                  transform: 'rotate(0deg)',
+                  opacity: rightArrowHover ? 1 : 0.6
                 }}
-                alt=""
-                src="https://c.animaapp.com/IeBsBV3O/img/polygon-1.svg"
-                aria-hidden="true"
               />
             </div>
           </div>
@@ -291,11 +349,7 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
               className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
               aria-label="Toggle steps dropdown"
             >
-              <img
-                className="w-[15px] h-[13px]"
-                alt="List check"
-                src="https://c.animaapp.com/Pqm9zsUr/img/list-check-1.svg"
-              />
+              <ListCheckIcon className="w-[15px] h-[13px] text-white" />
               <span className="[font-family:'DM_Sans',Helvetica] font-light text-white text-xs tracking-[0] leading-[normal]">
                 Steps
               </span>
@@ -306,33 +360,33 @@ export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps
           </div>
         </div>
 
-        <img
-          className="absolute top-[39px] left-[calc(50.00%_-_188px)] w-[377px] h-px object-cover"
-          alt=""
-          src="https://c.animaapp.com/IeBsBV3O/img/line-21.svg"
-          role="separator"
-          aria-hidden="true"
-        />
-
         <button
-          className="absolute top-1.5 left-[343px] w-[26px] h-[26px] cursor-pointer"
+          className="absolute top-1.5 left-[343px] w-[26px] h-[26px] cursor-pointer hover:opacity-80 transition-opacity"
           aria-label="User profile"
           type="button"
+          onClick={() => setShowUserMenu(!showUserMenu)}
         >
-          <img
-            className="w-full h-full"
-            alt=""
-            src="https://c.animaapp.com/IeBsBV3O/img/frame-16715.svg"
-            aria-hidden="true"
-          />
+          <UserBadgeIcon className="h-full w-full" />
         </button>
       </header>
+
+      {/* Horizontal line under header */}
+      <HorizontalRule
+        className="absolute w-[377px]"
+        style={{ top: '39px', left: '0', height: '1px' }}
+      />
 
       {/* Confirmation Modal */}
       <BackToProjectsConfirmation
         isVisible={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBackToProjects}
+      />
+
+      {/* User Menu */}
+      <UserMenu
+        isOpen={showUserMenu}
+        onClose={() => setShowUserMenu(false)}
       />
     </div>
   );

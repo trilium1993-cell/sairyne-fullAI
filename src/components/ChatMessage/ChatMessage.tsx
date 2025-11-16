@@ -49,16 +49,18 @@ export const ChatMessage = ({
     ));
   };
   
+  const fallbackAvatar = "https://c.animaapp.com/hOiZ2IT6/img/b56f1665-0403-49d2-b00e-ec2a27378422-1@2x.png";
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3 ${className}`}>
       <div className={`${baseClasses} ${messageClasses}`}>
         <div className="flex gap-2">
-          {!isUser && avatar && (
+          {!isUser && (
             <div className="w-[30px] h-[30px] flex-shrink-0 flex bg-[#141414] rounded-[17.75px] overflow-hidden border-[0.78px] border-solid border-[#ffffff1f]">
               <img
-                className="mt-[3.1px] w-[21.78px] h-[21.78px] ml-[3.1px] aspect-[1]"
+                className="w-full h-full object-cover"
                 alt="AI avatar"
-                src={avatar}
+                src={avatar ?? fallbackAvatar}
               />
             </div>
           )}

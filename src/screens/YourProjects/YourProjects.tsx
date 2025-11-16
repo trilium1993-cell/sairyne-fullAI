@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Window } from "../../components/Window";
-
-interface Project {
-  id: number;
-  name: string;
-  createdAt: string;
-}
+import {
+  StoredProject,
+  createProject,
+  listProjects,
+  removeProject,
+  renameProject,
+  setSelectedProject,
+  clearSelectedProject,
+  getSelectedProject,
+} from "../../services/projects";
 
 interface YourProjectsProps {
   onNext: () => void;
@@ -14,9 +18,9 @@ interface YourProjectsProps {
 
 export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<StoredProject[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<StoredProject[]>([]);
+  const [selectedProjectState, setSelectedProjectState] = useState<StoredProject | null>(null);
   const [contextMenu, setContextMenu] = useState<{ projectId: number; x: number; y: number } | null>(null);
   const [editingProject, setEditingProject] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
@@ -24,23 +28,14 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
 
   // Загружаем проекты из localStorage при монтировании компонента
   useEffect(() => {
-    try {
-      const savedProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      setProjects(savedProjects);
-      setFilteredProjects(savedProjects);
-      
-      // Проверяем, есть ли выделенный проект из CreateYourFirstProject
-      const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-      if (selectedProjectData) {
-        const project = JSON.parse(selectedProjectData);
-        setSelectedProject(project);
-        // Очищаем выделенный проект из localStorage
-        localStorage.removeItem('sairyne_selected_project');
-      }
-    } catch (error) {
-      // В случае ошибки парсинга, используем пустой массив
-      setProjects([]);
-      setFilteredProjects([]);
+    const savedProjects = listProjects();
+    setProjects(savedProjects);
+    setFilteredProjects(savedProjects);
+
+    const preselected = getSelectedProject();
+    if (preselected) {
+      setSelectedProjectState(preselected);
+      clearSelectedProject();
     }
   }, []);
 
@@ -78,38 +73,27 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   };
 
   const handleAddProject = () => {
-    try {
-      // Создаем новый проект с автоматическим названием
-      const newProject = {
-        id: Date.now(),
-        name: `New Project ${Date.now()}`,
-        createdAt: new Date().toISOString()
-      };
-      
-      const existingProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      existingProjects.push(newProject);
-      localStorage.setItem('sairyne_projects', JSON.stringify(existingProjects));
-      
-      // Обновляем список проектов
-      setProjects(existingProjects);
-      setFilteredProjects(existingProjects);
-      
-      // Переходим к следующему экрану
-      onNext();
-    } catch (error) {
-      // В случае ошибки все равно переходим дальше
-      onNext();
-    }
+    const newProject = createProject();
+    const updatedProjects = listProjects();
+    setProjects(updatedProjects);
+    setFilteredProjects(updatedProjects);
+    setSelectedProject(newProject);
+    setSelectedProjectState(newProject);
+    onNext();
   };
 
   const handleProjectClick = (projectId: number) => {
-    console.log("Open project:", projectId);
+    if (import.meta.env.DEV) {
+      console.debug('[yourProjects] open project', projectId);
+    }
     
-    // Сохраняем выбранный проект в localStorage
-    const selectedProject = projects.find(p => p.id === projectId);
-    if (selectedProject) {
-      localStorage.setItem('sairyne_selected_project', JSON.stringify(selectedProject));
-      console.log("Selected project saved:", selectedProject);
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setSelectedProject(project);
+      setSelectedProjectState(project);
+      if (import.meta.env.DEV) {
+        console.debug('[yourProjects] selected project saved', project);
+      }
     }
     
     // Переходим к чату для работы с проектом
@@ -136,21 +120,20 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   };
 
   const handleDeleteProject = (projectId: number) => {
-    const updatedProjects = projects.filter(p => p.id !== projectId);
-    setProjects(updatedProjects);
-    setFilteredProjects(updatedProjects);
-    localStorage.setItem('sairyne_projects', JSON.stringify(updatedProjects));
+    const updatedForUser = removeProject(projectId);
+    setProjects(updatedForUser);
+    setFilteredProjects(updatedForUser);
+    if (selectedProjectState?.id === projectId) {
+      setSelectedProjectState(null);
+    }
     setContextMenu(null);
   };
 
   const handleSaveEdit = (projectId: number) => {
     if (editName.trim()) {
-      const updatedProjects = projects.map(p => 
-        p.id === projectId ? { ...p, name: editName.trim() } : p
-      );
-      setProjects(updatedProjects);
-      setFilteredProjects(updatedProjects);
-      localStorage.setItem('sairyne_projects', JSON.stringify(updatedProjects));
+      const updated = renameProject(projectId, editName.trim());
+      setProjects(updated);
+      setFilteredProjects(updated);
       setEditingProject(null);
       setEditName("");
     }
@@ -169,11 +152,15 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   }, []);
 
   const handleClose = () => {
-    console.log("Close window");
+    if (import.meta.env.DEV) {
+      console.debug('[yourProjects] close window');
+    }
   };
 
   const handleExpand = () => {
-    console.log("Expand window");
+    if (import.meta.env.DEV) {
+      console.debug('[yourProjects] expand window');
+    }
   };
 
   return (
@@ -242,13 +229,13 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
             {(() => {
               // Сортируем проекты: выделенный проект первым, остальные по дате создания
               const sortedProjects = [...filteredProjects].sort((a, b) => {
-                if (selectedProject && a.id === selectedProject.id) return -1;
-                if (selectedProject && b.id === selectedProject.id) return 1;
+                if (selectedProjectState && a.id === selectedProjectState.id) return -1;
+                if (selectedProjectState && b.id === selectedProjectState.id) return 1;
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
               });
 
               return sortedProjects.map((project, index) => {
-                const isSelected = selectedProject && project.id === selectedProject.id;
+                const isSelected = selectedProjectState && project.id === selectedProjectState.id;
                 const isEditing = editingProject === project.id;
                 
                 return (

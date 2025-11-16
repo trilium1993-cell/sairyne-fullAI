@@ -38,3 +38,4 @@ coverage/
 
 # Parcel cache
 .parcel-cache/
+.vercel

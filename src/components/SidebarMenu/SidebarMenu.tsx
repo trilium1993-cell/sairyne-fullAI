@@ -8,7 +8,9 @@ interface SidebarMenuProps {
 }
 
 export const SidebarMenu = ({ isVisible, onClose }: SidebarMenuProps): JSX.Element => {
-  console.log("SidebarMenu rendered, isVisible:", isVisible);
+  if (import.meta.env.DEV) {
+    console.debug('[sidebar] render', { isVisible });
+  }
   
   const steps = [
     "Set up the project (tempo, time signature, basic settings).",

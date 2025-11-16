@@ -8,6 +8,7 @@ import closeIcon from '../../assets/img/vector.svg';
 interface FixIssuesChatProps {
   onClose: () => void;
   existingMessages: Message[];
+  onMessagesUpdate?: (messages: Message[]) => void;
 }
 
 interface Message {
@@ -18,11 +19,18 @@ interface Message {
   isTyping?: boolean;
 }
 
-export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingMessages }) => {
+export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingMessages, onMessagesUpdate }) => {
   const [messages, setMessages] = useState<Message[]>(existingMessages);
   const [showOptions, setShowOptions] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  
+  // Синхронизируем сообщения обратно в родительский компонент
+  useEffect(() => {
+    if (onMessagesUpdate) {
+      onMessagesUpdate(messages);
+    }
+  }, [messages, onMessagesUpdate]);
 
   // Инициализация новых сообщений - только один раз
   useEffect(() => {

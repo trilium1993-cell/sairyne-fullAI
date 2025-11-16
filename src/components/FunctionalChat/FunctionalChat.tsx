@@ -16,8 +16,16 @@ import { ErrorBoundary } from "../ErrorBoundary";
 import { createChatSteps } from "../../data/chatSteps";
 import { WINDOW, ANIMATION } from "../../constants/dimensions";
 import { ChatService } from "../../services/chatService";
-import arrowsIcon from '../../assets/img/arrows-in-simple-light-1.svg';
 import closeIcon from '../../assets/img/vector.svg';
+import { resolveIsEmbedded } from "../../utils/embed";
+import { AnalyticsService } from "../../services/analyticsService";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
+
+const SEND_ICON = "https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg";
+const ANALYSIS_ICON = "https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg";
+const LEARN_ICON = "https://c.animaapp.com/hOiZ2IT6/img/stack-1-1.svg";
+const CARET_ICON = "https://c.animaapp.com/hOiZ2IT6/img/polygon-1-2.svg";
+const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
 
 interface Message {
   id: string;
@@ -91,7 +99,6 @@ const ChatContainer = React.memo(({
           isTyping={message.isTyping}
           isThinking={message.isThinking}
           isUser={message.type === 'user'}
-          avatar={message.type === 'ai' ? "https://c.animaapp.com/hOiZ2IT6/img/b56f1665-0403-49d2-b00e-ec2a27378422-1@2x.png" : undefined}
         />
       ))}
 
@@ -154,11 +161,10 @@ const ChatContainer = React.memo(({
 });
 
 interface FunctionalChatProps {
-  onNext?: () => void;
   onBack?: () => void;
 }
 
-export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JSX.Element => {
+export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
@@ -185,23 +191,82 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
   const [completedSteps, setCompletedSteps] = useState(0);
   const [hasCompletedAnalysis, setHasCompletedAnalysis] = useState(false);
   const [showAnalysisPopup, setShowAnalysisPopup] = useState(false);
+  const [isOffline, setIsOffline] = useState(() => {
+    if (IS_DEV) return false;
+    if (typeof navigator === 'undefined') return false;
+    return !navigator.onLine;
+  });
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [lastOnlineCheck, setLastOnlineCheck] = useState<number | null>(null);
+  const [isInterfaceReady, setIsInterfaceReady] = useState(false);
+  const isEmbedded = resolveIsEmbedded();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
+  
+  // Сохранение состояния для каждого режима
+  interface ModeState {
+    messages: Message[];
+    currentStep: number;
+    scrollPosition: number;
+    showOptions: boolean;
+    showGenres: boolean;
+    showReadyButton: boolean;
+    showCompletedStep: boolean;
+    completedStepText: string;
+  }
+  const modeStatesRef = useRef<Record<string, ModeState>>({
+    learn: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" },
+    create: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" },
+    pro: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" }
+  });
+  const previousModeRef = useRef<string>(selectedLearnLevel);
+
+  // Инициализация состояния для текущего режима при первом рендере
+  useEffect(() => {
+    const savedState = modeStatesRef.current[selectedLearnLevel];
+    if (savedState && savedState.messages.length > 0) {
+      setMessages([...savedState.messages]);
+      setCurrentStep(savedState.currentStep);
+      setShowOptions(savedState.showOptions);
+      setShowGenres(savedState.showGenres);
+      setShowReadyButton(savedState.showReadyButton);
+      setShowCompletedStep(savedState.showCompletedStep);
+      setCompletedStepText(savedState.completedStepText);
+    }
+    previousModeRef.current = selectedLearnLevel;
+  }, []); // Только при монтировании
+
+  // Автоматическое сохранение состояния для текущего режима при изменениях
+  useEffect(() => {
+    if (chatContainerRef.current && previousModeRef.current) {
+      const currentState: ModeState = {
+        messages: [...messages],
+        currentStep,
+        scrollPosition: chatContainerRef.current.scrollTop,
+        showOptions,
+        showGenres,
+        showReadyButton,
+        showCompletedStep,
+        completedStepText
+      };
+      modeStatesRef.current[previousModeRef.current] = currentState;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
   // Получаем название проекта и пользователя из localStorage
   useEffect(() => {
-    const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-    if (selectedProjectData) {
-      try {
-        const project = JSON.parse(selectedProjectData);
-        if (project && project.name) {
-          setProjectName(project.name);
-        }
-      } catch (error) {
-        // В случае ошибки используем дефолтное название
+    const selectedProject = getSelectedProject();
+    if (selectedProject && selectedProject.name) {
+      setProjectName(selectedProject.name);
+    } else {
+      const latestProject = getLatestProject();
+      if (latestProject) {
+        setSelectedProject(latestProject);
+        setProjectName(latestProject.name);
       }
     }
 
@@ -212,12 +277,66 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
         const user = JSON.parse(currentUserData);
         if (user && user.email) {
           // Можно добавить отображение email пользователя в UI
-          console.log('Current user:', user.email);
+          if (IS_DEV) {
+            console.debug('[chat] current user', user.email);
+          }
         }
       } catch (error) {
         // В случае ошибки игнорируем
       }
     }
+  }, []);
+
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => setIsInterfaceReady(true));
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (IS_DEV) {
+      setIsOffline(false);
+      setLastOnlineCheck(Date.now());
+      return;
+    }
+
+    let isMounted = true;
+
+    const evaluateHealth = async () => {
+      const healthy = await ChatService.checkHealth();
+      if (!isMounted) return;
+      if (healthy) {
+        setIsOffline(false);
+        setLastOnlineCheck(Date.now());
+      } else {
+        setIsOffline(true);
+      }
+    };
+
+    const handleOnline = () => {
+      setIsOffline(false);
+      setLastOnlineCheck(Date.now());
+    };
+
+    const handleOffline = () => {
+      setIsOffline(true);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      evaluateHealth();
+
+      return () => {
+        isMounted = false;
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
+    }
+    
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   // Создаем шаги чата с актуальным названием проекта
@@ -292,146 +411,220 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
   // Обработка отправки сообщения
   const handleSendMessage = async () => {
-    if (userInput.trim()) {
-      const messageText = userInput.trim();
-      
-      // Очищаем поле ввода сразу
-      setUserInput("");
-      
-      // Добавляем сообщение пользователя в чат
-      addUserMessage(messageText);
-      
-      // Проверяем режим: Pro Mode = AI, Learn/Create = статичные шаги
-      const isProMode = selectedLearnLevel === 'pro';
-      
-      if (isProMode) {
-        // PRO MODE: Используем AI (OpenAI)
-        try {
-          // Показываем индикатор "AI думает"
-          const thinkingId = Date.now().toString();
-          setMessages(prev => [...prev, {
-            id: thinkingId,
-            type: 'ai',
-            content: '...',
-            timestamp: Date.now(),
-            isThinking: true
-          }]);
-
-          // Отправляем запрос в backend
-          const conversationHistory = messages.map(msg => ({
-            type: msg.type,
-            content: msg.content
-          }));
-          
-          const aiResponse = await ChatService.sendMessage(messageText, conversationHistory);
-          
-          // Удаляем индикатор "думает"
-          setMessages(prev => prev.filter(msg => msg.id !== thinkingId));
-          
-          // Добавляем ответ AI с анимацией печатания
-          addAIMessage(aiResponse);
-          
-        } catch (error) {
-          console.error('AI chat error:', error);
-          // Удаляем индикатор "думает"
-          setMessages(prev => prev.filter(msg => msg.isThinking));
-          // Показываем сообщение об ошибке
-          addAIMessage("Sorry, I couldn't process your request. Please try again.");
-        }
-        
-        return;
-      }
-      
-      // LEARN/CREATE MODE: Статичные шаги (существующая логика)
-      // Если это сообщение "I'm ready! Let's start!", подсвечиваем кнопку
-      if (messageText === "I'm ready! Let's start!") {
-        setReadyButtonHighlighted(true);
-      }
-      
-      // Скрываем все опции после отправки сообщения
+    if (!userInput.trim()) {
+      console.log('[FunctionalChat] handleSendMessage: Empty input, ignoring');
+      return;
+    }
+    
+    const messageText = userInput.trim();
+    console.log('[FunctionalChat] handleSendMessage called:', messageText);
+    console.log('[FunctionalChat] Current mode:', selectedLearnLevel);
+    console.log('[FunctionalChat] Current messages count:', messages.length);
+    
+    // Очищаем поле ввода сразу
+    setUserInput("");
+    
+    // Проверяем режим: Pro Mode = AI, Learn/Create = статичные шаги
+    const isProMode = selectedLearnLevel === 'pro';
+    console.log('[FunctionalChat] Is Pro Mode:', isProMode);
+    
+    if (isProMode) {
+      console.log('[FunctionalChat] Pro Mode: Processing message');
       setShowOptions(false);
       setShowGenres(false);
       setShowReadyButton(false);
       setShowStepContent(false);
       setShowCompletedStep(false);
       setCompletedStepText("");
-      
 
-      // Находим текущий шаг и переходим к следующему
-      const currentStepData = chatSteps.find(step => step.id === currentStep);
-      if (currentStepData && currentStepData.nextStep !== undefined) {
-        const nextStep = chatSteps[currentStepData.nextStep];
-        if (nextStep) {
-          // Если это шаг "thinking" (id: 2), показываем прозрачный текст с задержкой
-          if (nextStep.isThinking) {
-            addAIMessage(nextStep.ai, () => {
-              // После показа thinking сообщения, исчезает через 2 секунды и переходим к следующему шагу
-              setTimeout(() => {
-                // Удаляем thinking сообщение
-                setMessages(prev => prev.filter(msg => !msg.isThinking));
-                
-                // Переходим к следующему шагу
-                const realNextStep = chatSteps[nextStep.nextStep];
-                if (realNextStep) {
-                  setCurrentStep(nextStep.nextStep);
-                  addAIMessage(realNextStep.ai, () => {
-                    if (realNextStep.id === 3) {
-                      setShowReadyButton(true);
-                      // Кнопка появляется с прозрачным background, без подсветки
-                    }
-                  });
-                }
-              }, 2000); // 2 секунды задержка для "thinking"
-            }, true); // true = прозрачный текст
-          } else {
-            setTimeout(() => {
-              setCurrentStep(currentStepData.nextStep);
-              addAIMessage(nextStep.ai, () => {
-                // Показываем соответствующие опции для следующего шага после завершения анимации
-                setTimeout(() => {
-                  if (nextStep.id === 1) {
-                    setShowGenres(true);
-                  } else if (nextStep.id === 3) {
-                    setShowReadyButton(true);
-                  } else if (nextStep.id === 4) {
-                    setShowStepContent(true);
-                    // Показываем опции для шага 4 (Show visual tips, Completed. Next step.)
-                    setTimeout(() => {
-                      setShowOptions(true);
-                      // Показываем "Completed. Next step." после завершения анимации
-                      setTimeout(() => {
-                        setShowCompletedStep(true);
-                        // Анимация печатания для "Completed. Next step."
-                        const text = "Completed. Next step.";
-                        let charIndex = 0;
-                        const typeTimer = setInterval(() => {
-                          if (charIndex < text.length) {
-                            setCompletedStepText(text.substring(0, charIndex + 1));
-                            charIndex++;
-                          } else {
-                            clearInterval(typeTimer);
-                          }
-                        }, 50); // Скорость печатания
-                      }, 3000); // Задержка после завершения анимации печатания
-                    }, 500); // Задержка после завершения анимации печатания
-                  } else if (nextStep.id === 5) {
-                    setShowStepContent(true);
-                    // Для Step 5 (Step 2 of 7 — Kick Drum) показываем кнопку "Show visual tips" 
-                    // после завершения анимации печатания, аналогично Step 4
-                    setTimeout(() => {
-                      setShowOptions(true);
-                    }, 500); // Задержка после завершения анимации печатания
-                  }
-                }, 500); // Задержка после завершения анимации печатания
-              });
-            }, 1200);
-          }
-        }
+      if (isOffline) {
+        console.log('[FunctionalChat] Pro Mode: Offline, showing offline message');
+        // Добавляем сообщение пользователя даже в оффлайн режиме
+        addUserMessage(messageText);
+        addAIMessage("You're currently offline. Please reconnect to the server to continue the AI conversation.");
+        return;
       }
       
-      // Очищаем поле ввода
-      setUserInput("");
+      // PRO MODE: Используем AI (OpenAI)
+      console.log('[FunctionalChat] Pro Mode: Starting AI request');
+      
+      // Показываем индикатор "AI думает"
+      const thinkingId = Date.now().toString();
+      
+      // Добавляем сообщение пользователя И thinking сообщение в одном обновлении состояния
+      setMessages(prev => {
+        // Создаем сообщение пользователя
+        const userMessage: Message = {
+          id: `user-${Date.now()}`,
+          type: 'user',
+          content: messageText,
+          timestamp: Date.now(),
+        };
+        
+        // Добавляем сообщение пользователя и thinking сообщение
+        const newMessages: Message[] = [
+          ...prev,
+          userMessage,
+          {
+            id: thinkingId,
+            type: 'ai' as const,
+            content: '...',
+            timestamp: Date.now(),
+            isThinking: true
+          }
+        ];
+        
+        console.log('[FunctionalChat] Pro Mode: Added user message and thinking, total messages:', newMessages.length);
+        console.log('[FunctionalChat] Pro Mode: User message:', userMessage.content);
+        
+        // Формируем историю разговора (без thinking сообщения)
+        const conversationHistory = newMessages
+          .filter(msg => {
+            const isValid = !msg.isThinking && !msg.isTyping && msg.content.trim() !== '';
+            const isNotSystem = msg.content !== "Completed. Next step." && !msg.content.includes("Completed.");
+            return isValid && isNotSystem;
+          })
+          .map(msg => ({
+            type: msg.type,
+            content: msg.content
+          }));
+        
+        console.log('[FunctionalChat] Pro Mode: Conversation history length:', conversationHistory.length);
+        console.log('[FunctionalChat] Pro Mode: Conversation history:', conversationHistory.map(m => ({ type: m.type, content: m.content.substring(0, 50) })));
+        console.log('[FunctionalChat] Pro Mode: Sending to ChatService.sendMessage...');
+        
+        // Отправляем запрос асинхронно
+        ChatService.sendMessage(messageText, conversationHistory)
+          .then(aiResponse => {
+            console.log('[FunctionalChat] Pro Mode: Received AI response, length:', aiResponse?.length || 0);
+            
+            // Удаляем индикатор "думает"
+            setMessages(prevMsgs => {
+              const filtered = prevMsgs.filter(msg => msg.id !== thinkingId);
+              console.log('[FunctionalChat] Pro Mode: Removed thinking message, remaining messages:', filtered.length);
+              return filtered;
+            });
+            
+            // Добавляем ответ AI с анимацией печатания
+            addAIMessage(aiResponse);
+            AnalyticsService.track('AIMessageSent', {
+              mode: 'pro',
+              characters: aiResponse?.length || 0,
+            });
+            
+            console.log('[FunctionalChat] Pro Mode: Message sent successfully');
+          })
+          .catch(error => {
+            console.error('[FunctionalChat] Pro Mode: AI chat error:', error);
+            // Удаляем индикатор "думает"
+            setMessages(prevMsgs => prevMsgs.filter(msg => !msg.isThinking));
+            // Показываем сообщение об ошибке
+            addAIMessage("Sorry, I couldn't process your request. Please try again.");
+          });
+        
+        return newMessages;
+      });
+      
+      // Скроллим вниз после добавления сообщения
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+      
+      return;
     }
+    
+    // LEARN/CREATE MODE: Добавляем сообщение пользователя
+    addUserMessage(messageText);
+    
+    // LEARN/CREATE MODE: Статичные шаги (существующая логика)
+    // Если это сообщение "I'm ready! Let's start!", подсвечиваем кнопку
+    if (messageText === "I'm ready! Let's start!") {
+      setReadyButtonHighlighted(true);
+    }
+    
+    // Скрываем все опции после отправки сообщения
+    setShowOptions(false);
+    setShowGenres(false);
+    setShowReadyButton(false);
+    setShowStepContent(false);
+    setShowCompletedStep(false);
+    setCompletedStepText("");
+    
+
+    // Находим текущий шаг и переходим к следующему
+    const currentStepData = chatSteps.find(step => step.id === currentStep);
+    if (currentStepData && currentStepData.nextStep !== undefined) {
+      const nextStep = chatSteps[currentStepData.nextStep];
+      if (nextStep) {
+        // Если это шаг "thinking" (id: 2), показываем прозрачный текст с задержкой
+        if (nextStep.isThinking) {
+          addAIMessage(nextStep.ai, () => {
+            // После показа thinking сообщения, исчезает через 2 секунды и переходим к следующему шагу
+            setTimeout(() => {
+              // Удаляем thinking сообщение
+              setMessages(prev => prev.filter(msg => !msg.isThinking));
+              
+              // Переходим к следующему шагу
+              const realNextStep = chatSteps[nextStep.nextStep];
+              if (realNextStep) {
+                setCurrentStep(nextStep.nextStep);
+                addAIMessage(realNextStep.ai, () => {
+                  if (realNextStep.id === 3) {
+                    setShowReadyButton(true);
+                    // Кнопка появляется с прозрачным background, без подсветки
+                  }
+                });
+              }
+            }, 2000); // 2 секунды задержка для "thinking"
+          }, true); // true = прозрачный текст
+        } else {
+          setTimeout(() => {
+            setCurrentStep(currentStepData.nextStep);
+            addAIMessage(nextStep.ai, () => {
+              // Показываем соответствующие опции для следующего шага после завершения анимации
+              setTimeout(() => {
+                if (nextStep.id === 1) {
+                  setShowGenres(true);
+                } else if (nextStep.id === 3) {
+                  setShowReadyButton(true);
+                } else if (nextStep.id === 4) {
+                  setShowStepContent(true);
+                  // Показываем опции для шага 4 (Show visual tips, Completed. Next step.)
+                  setTimeout(() => {
+                    setShowOptions(true);
+                    // Показываем "Completed. Next step." после завершения анимации
+                    setTimeout(() => {
+                      setShowCompletedStep(true);
+                      // Анимация печатания для "Completed. Next step."
+                      const text = "Completed. Next step.";
+                      let charIndex = 0;
+                      const typeTimer = setInterval(() => {
+                        if (charIndex < text.length) {
+                          setCompletedStepText(text.substring(0, charIndex + 1));
+                          charIndex++;
+                        } else {
+                          clearInterval(typeTimer);
+                        }
+                      }, 50); // Скорость печатания
+                    }, 3000); // Задержка после завершения анимации печатания
+                  }, 500); // Задержка после завершения анимации печатания
+                } else if (nextStep.id === 5) {
+                  setShowStepContent(true);
+                  // Для Step 5 (Step 2 of 7 — Kick Drum) показываем кнопку "Show visual tips" 
+                  // после завершения анимации печатания, аналогично Step 4
+                  setTimeout(() => {
+                    setShowOptions(true);
+                  }, 500); // Задержка после завершения анимации печатания
+                }
+              }, 500); // Задержка после завершения анимации печатания
+            });
+          }, 1200);
+        }
+      }
+    }
+    
+    // Очищаем поле ввода
+    setUserInput("");
   };
 
 
@@ -449,6 +642,13 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
       });
     }
   }, [chatSteps, addAIMessage]);
+
+  useEffect(() => {
+    AnalyticsService.track('PluginOpened', { embedded: isEmbedded });
+    return () => {
+      AnalyticsService.track('PluginClosed', { embedded: isEmbedded });
+    };
+  }, [isEmbedded]);
 
   // Автоскролл при добавлении новых сообщений
   useEffect(() => {
@@ -593,7 +793,9 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
   }, []);
 
   const handleFixIssues = useCallback((sectionTitle: string) => {
-    console.log(`Fix issues for: ${sectionTitle}`);
+    if (IS_DEV) {
+      console.debug('[analysis] fix issues for', sectionTitle);
+    }
     // Показываем окно FixIssuesChat только для первого checkpoint (Critical Issues)
     if (sectionTitle === "Critical Issues") {
       setShowFixIssuesChat(true);
@@ -605,13 +807,79 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
   }, []);
 
   const handleLearn = useCallback(() => {
-    console.log("Learn clicked");
+    if (IS_DEV) {
+      console.debug('[learn] toggle panel');
+    }
     setShowLearnMode(!showLearnMode);
   }, [showLearnMode]);
 
   const handleLearnLevelSelect = useCallback((level: string) => {
+    console.log('[FunctionalChat] Switching mode from', previousModeRef.current, 'to', level);
+    
+    // Если переключаемся на Pro Mode, закрываем FixIssuesChat чтобы показать основной чат
+    if (level === 'pro' && showFixIssuesChat) {
+      console.log('[FunctionalChat] Closing FixIssuesChat when switching to Pro Mode');
+      setShowFixIssuesChat(false);
+    }
+    
+    // Сохраняем текущее состояние перед переключением режима
+    if (chatContainerRef.current) {
+      const currentState: ModeState = {
+        messages: [...messages],
+        currentStep,
+        scrollPosition: chatContainerRef.current.scrollTop,
+        showOptions,
+        showGenres,
+        showReadyButton,
+        showCompletedStep,
+        completedStepText
+      };
+      modeStatesRef.current[previousModeRef.current] = currentState;
+      console.log('[FunctionalChat] Saved state for', previousModeRef.current, ':', {
+        messagesCount: currentState.messages.length,
+        currentStep: currentState.currentStep
+      });
+    }
+    
+    // Восстанавливаем сохраненное состояние для нового режима
+    const savedState = modeStatesRef.current[level];
+    if (savedState) {
+      console.log('[FunctionalChat] Restoring state for', level, ':', {
+        messagesCount: savedState.messages.length,
+        currentStep: savedState.currentStep
+      });
+      
+      setMessages([...savedState.messages]);
+      setCurrentStep(savedState.currentStep);
+      setShowOptions(savedState.showOptions);
+      setShowGenres(savedState.showGenres);
+      setShowReadyButton(savedState.showReadyButton);
+      setShowCompletedStep(savedState.showCompletedStep);
+      setCompletedStepText(savedState.completedStepText);
+      
+      // Восстанавливаем позицию скролла после рендера
+      requestAnimationFrame(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = savedState.scrollPosition;
+        }
+      });
+    } else {
+      // Если режим новый, сбрасываем состояние
+      console.log('[FunctionalChat] New mode', level, '- resetting state');
+      setMessages([]);
+      setCurrentStep(0);
+      setShowOptions(false);
+      setShowGenres(false);
+      setShowReadyButton(false);
+      setShowCompletedStep(false);
+      setCompletedStepText("");
+    }
+    
+    previousModeRef.current = level;
     setSelectedLearnLevel(level);
-  }, []);
+    
+    console.log('[FunctionalChat] Mode switched to', level);
+  }, [messages, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText, showFixIssuesChat]);
 
   const handleCloseLearnMode = useCallback(() => {
     setShowLearnMode(false);
@@ -633,18 +901,6 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
   const handleSidebarClose = useCallback(() => {
     setShowSidebar(false);
-  }, []);
-
-  const handleCloseApp = useCallback(() => {
-    // Закрываем приложение
-    window.close();
-  }, []);
-
-  const handleMinimizeApp = useCallback(() => {
-    // Сворачиваем приложение (работает в Electron)
-    if ('minimize' in window) {
-      (window as any).minimize();
-    }
   }, []);
 
   const handleVisualTipsToggle = useCallback(() => {
@@ -672,6 +928,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
     }
     
     // Переключаем состояние
+    AnalyticsService.track('VisualTipClicked', { action: showVisualTips ? 'hide' : 'show' });
     setShowVisualTips(!showVisualTips);
     
     // Восстанавливаем скролл и позицию после завершения transition (500ms)
@@ -690,6 +947,21 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
       setIsTogglingVisualTips(false);
     }, ANIMATION.DURATION);
   }, [showVisualTips]);
+
+  const handleReconnect = useCallback(async () => {
+    setIsCheckingHealth(true);
+    try {
+      const healthy = await ChatService.checkHealth();
+      if (healthy) {
+        setIsOffline(false);
+        setLastOnlineCheck(Date.now());
+      } else {
+        setIsOffline(true);
+      }
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
 
   // Обработка клика по опции
   const handleOptionClick = useCallback((option: string) => {
@@ -711,7 +983,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
   const mainContent = (
     <div 
-      className={`relative bg-[#413f42] overflow-hidden transition-all ease-out`}
+      className={`relative overflow-hidden transition-all ease-out sairyne-surface bg-[#413f42] text-white ${isInterfaceReady ? 'opacity-100' : 'opacity-0'}`}
       style={{
         height: `${WINDOW.OUTER_HEIGHT}px`,
         width: showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary ? `${WINDOW.EXPANDED_WIDTH}px` : `${WINDOW.OUTER_WIDTH}px`,
@@ -719,51 +991,39 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
         transitionDuration: `${ANIMATION.DURATION}ms`,
         transitionTimingFunction: ANIMATION.TIMING_FUNCTION
       }}>
-      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 flex items-center justify-between px-3 h-5 min-h-[20px]">
-        <h1 className="[font-family:'Inter',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-          Sairyne
-        </h1>
-        
-        <div className="flex items-center gap-2">
-          {/* Minimize button */}
+    <div 
+      className={`relative overflow-hidden transition-all ease-out sairyne-surface bg-[#413f42] text-white ${isInterfaceReady ? 'opacity-100' : 'opacity-0'}`}
+      style={{
+        height: `${WINDOW.OUTER_HEIGHT}px`,
+        width: showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary ? `${WINDOW.EXPANDED_WIDTH}px` : `${WINDOW.OUTER_WIDTH}px`,
+        borderRadius: `${WINDOW.OUTER_BORDER_RADIUS}px`,
+        transitionDuration: `${ANIMATION.DURATION}ms`,
+        transitionTimingFunction: ANIMATION.TIMING_FUNCTION
+      }}>
+      {isOffline && (
+        <div className="absolute left-4 right-4 top-4 z-[900] flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[#b45309] px-4 py-3 text-sm text-white shadow-lg transition-opacity duration-300">
+          <div className="flex flex-col">
+            <span className="font-medium">Connection lost. Reconnect to restore AI features.</span>
+            {lastOnlineCheck && (
+              <span className="text-xs opacity-80">
+                Last online: {new Date(lastOnlineCheck).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
           <button
-            onClick={handleMinimizeApp}
-            className="w-5 h-5 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-            aria-label="Minimize application"
+            onClick={handleReconnect}
+            disabled={isCheckingHealth}
+            className="flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-white transition-colors hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <img
-              className="w-[18px] h-[18px]"
-              alt="Minimize"
-              src={arrowsIcon}
-            />
-          </button>
-          
-          {/* Close app button - always visible */}
-          <button
-            onClick={handleCloseApp}
-            className="w-5 h-5 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-            aria-label="Close application"
-          >
-            <img
-              className="w-[14px] h-[14px]"
-              alt="Close"
-              src={closeIcon}
-            />
+            {isCheckingHealth ? 'Reconnecting…' : 'Reconnect'}
           </button>
         </div>
-      </header>
-
-      {/* Horizontal line extending from chat to Visual Tips */}
-      <div className={`absolute top-[67px] left-[3px] h-[1px] bg-white/10 transition-all duration-500 ease-out ${
-        showVisualTips || showProjectAnalysis || showAnalysingChannels ? 'w-[1139px]' : 'w-[377px]'
-      }`} style={{
-        transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-      }} />
+      )}
 
       {/* Vertical line between chat and right panel */}
       {(showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary) && (
         <div 
-          className="absolute bg-white/20 transition-all ease-out"
+          className="absolute transition-all ease-out"
           style={{
             top: `${WINDOW.INNER_TOP}px`,
             left: `${WINDOW.DIVIDER_LEFT}px`,
@@ -771,13 +1031,14 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
             height: `${WINDOW.OUTER_HEIGHT - WINDOW.INNER_TOP}px`,
             transitionDuration: `${ANIMATION.DURATION}ms`,
             transitionTimingFunction: ANIMATION.TIMING_FUNCTION,
-            zIndex: 25
+            zIndex: 25,
+            backgroundColor: 'rgba(255,255,255,0.2)'
           }}
         />
       )}
 
       <main 
-        className="absolute bg-[#141414] overflow-hidden transition-all ease-out"
+        className="absolute overflow-hidden transition-all ease-out bg-[#141414]"
         style={{
           top: `${WINDOW.INNER_TOP}px`,
           left: `${WINDOW.INNER_LEFT}px`,
@@ -815,6 +1076,10 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 <FixIssuesChat 
                   onClose={handleCloseFixIssuesChat}
                   existingMessages={messages}
+                  onMessagesUpdate={(updatedMessages) => {
+                    console.log('[FunctionalChat] FixIssuesChat updated messages, count:', updatedMessages.length);
+                    setMessages(updatedMessages);
+                  }}
                 />
               </div>
             ) : (
@@ -912,25 +1177,28 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
             )}
 
             {/* Поле ввода сообщения */}
-            <div className={`absolute bottom-[10px] left-[10px] h-[116px] bg-[#ffffff0d] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-500 ease-out ${
-              showVisualTips ? 'w-[357px]' : 'w-[357px]'
-            } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''}`} style={{
-              transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-            }}>
-              <textarea
+            <div
+              className={`absolute bottom-[10px] left-[10px] h-[116px] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-500 ease-out ${
+                showVisualTips ? 'w-[357px]' : 'w-[357px]'
+              } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} bg-[#ffffff0d] border border-white/5 text-white`}
+              style={{
+                transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+              }}
+            >
+              <input
+                type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter') {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
                 placeholder="Message..."
-                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none overflow-y-auto"
+                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
                 style={{ 
                   width: 'calc(100% - 100px)',
-                  height: 'calc(100% - 60px)',
                   fontFamily: 'var(--body-font-family)',
                   fontSize: 'var(--body-font-size)',
                   fontStyle: 'var(--body-font-style)',
@@ -942,7 +1210,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
               {userInput ? (
                 <button
-                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] flex items-center justify-center rounded-md cursor-pointer transition-all duration-300 ease-out bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110"
+                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] flex items-center justify-center rounded-md cursor-pointer transition-all duration-300 ease-out bg-[linear-gradient(134deg,rgba(115,34,182,1)_0%,rgba(83,12,141,1)_100%),linear-gradient(0deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.08)_100%)] shadow-[0_0_12px_rgba(168,85,247,0.5)] hover:shadow-[0_0_16px_rgba(168,85,247,0.7)] hover:brightness-110 hover:scale-110"
                   style={{
                     transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
                   }}
@@ -953,7 +1221,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                   <img
                     className="w-[28px] h-[28px]"
                     alt="Send"
-                    src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                    src={SEND_ICON}
                     style={{
                       filter: 'brightness(0) invert(1)'
                     }}
@@ -961,13 +1229,19 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 </button>
               ) : (
                 <img
-                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 hover:opacity-80"
+                  className="absolute bottom-[6px] right-[6px] w-[28px] h-[28px] cursor-pointer transition-all duration-300 ease-out hover:scale-110 opacity-80 hover:opacity-100"
                   style={{
                     transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
                   }}
                   alt="Send"
-                  src="https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg"
+                  src={SEND_ICON}
                   onClick={handleSendMessage}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.filter = 'brightness(0) saturate(100%) invert(27%) sepia(51%) saturate(2878%) hue-rotate(258deg) brightness(104%) contrast(97%) drop-shadow(0 0 8px rgba(168,85,247,0.6))';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.filter = '';
+                  }}
                 />
               )}
 
@@ -976,8 +1250,8 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 disabled={currentStep < 5}
                 className={`absolute bottom-[6px] right-[268px] flex items-center gap-1 rounded-[6px] px-[7px] py-[7px] transition-all duration-300 ease-out ${
                   currentStep < 5 
-                    ? 'bg-[#21182940] border border-solid border-[#e8ceff10] cursor-not-allowed opacity-50' 
-                    : 'bg-[#211829] border border-solid border-[#e8ceff21] cursor-pointer hover:bg-[#2a1f35] hover:border-[#e8ceff40]'
+                    ? 'bg-[#21182940] border border-solid border-[#e8ceff10] text-white cursor-not-allowed opacity-50' 
+                    : 'bg-[#211829] border border-solid border-[#e8ceff21] text-white hover:bg-[#2a1f35] hover:border-[#e8ceff40] cursor-pointer'
                 }`}
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
@@ -986,7 +1260,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 <img
                   className="w-4 h-4"
                   alt="Analysis"
-                  src="https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg"
+                  src={ANALYSIS_ICON}
                 />
                 <span className="text-white" style={{
                   fontFamily: 'var(--helper-font-family)',
@@ -1000,7 +1274,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
 
               <button
                 onClick={handleLearn}
-                className="absolute bottom-[6px] left-[93px] flex items-center gap-1 bg-[#211829] border border-solid border-[#e8ceff21] rounded-[6px] px-[7px] py-[7px] cursor-pointer transition-all duration-300 ease-out hover:bg-[#2a1f35] hover:border-[#e8ceff40]"
+                className="absolute bottom-[6px] left-[93px] flex items-center gap-1 rounded-[6px] px-[7px] py-[7px] cursor-pointer transition-all duration-300 ease-out bg-[#211829] border border-solid border-[#e8ceff21] text-white hover:bg-[#2a1f35] hover:border-[#e8ceff40]"
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
                 }}
@@ -1008,7 +1282,7 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 <img
                   className="w-4 h-4"
                   alt="Learn"
-                  src="https://c.animaapp.com/hOiZ2IT6/img/stack-1-1.svg"
+                  src={LEARN_ICON}
                 />
                 <span className="text-white" style={{
                   fontFamily: 'var(--helper-font-family)',
@@ -1020,8 +1294,8 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
                 }}>{getLevelName(selectedLearnLevel)}</span>
                 <img
                   className="w-[6.93px] h-[4.5px]"
-                  alt="Polygon"
-                  src="https://c.animaapp.com/hOiZ2IT6/img/polygon-1-2.svg"
+                  alt="Select level"
+                  src={CARET_ICON}
                 />
               </button>
 
@@ -1206,6 +1480,8 @@ export const FunctionalChat = ({ onNext, onBack }: FunctionalChatProps = {}): JS
           </div>
         )}
       </main>
+
+      </div>
 
 
       {/* Sidebar Menu */}

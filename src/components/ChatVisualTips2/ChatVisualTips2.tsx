@@ -1,4 +1,5 @@
 import "./style.css";
+import { useState } from "react";
 
 interface ChatVisualTips2Props {
   currentStep?: number;
@@ -180,31 +181,45 @@ const visualTipsData: VisualTip[] = [
   }
 ];
 
-export const ChatVisualTips2 = ({ currentStep }: ChatVisualTips2Props): JSX.Element => {
-  console.log("ChatVisualTips2 render:", { currentStep });
+const Screenshot = ({ className, alt, src }: { className: string; alt: string; src: string }) => {
+  const [failed, setFailed] = useState(false);
 
-  // Get the appropriate tip data based on currentStep
+  if (failed) {
+    return (
+      <div
+        className={`${className} flex items-center justify-center rounded-md border border-dashed border-white/20 bg-white/5 px-3 text-center text-xs text-white/70`}
+      >
+        {alt}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      className={className}
+      alt={alt}
+      src={src}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
+export const ChatVisualTips2 = ({ currentStep }: ChatVisualTips2Props): JSX.Element => {
   const stepNumber = Number(currentStep) || 1;
   const tip = visualTipsData.find(t => t.stepNumber === stepNumber) || visualTipsData[0];
-  
-  console.log("ChatVisualTips2 debug:", {
-    stepNumber,
-    tipFound: tip,
-    tipTitle: tip?.title,
-    tipStepNumber: tip?.stepNumber
-  });
+
+  if (import.meta.env.DEV) {
+    console.debug('[chatVisualTips2] render', { currentStep, stepNumber, tip });
+  }
   return (
     <div className="visual-tips-window-new">
       <div className="frame-3">
         {/* Header */}
         <div className="frame-8">
           <div className="text-wrapper-17"></div>
-          <div className="group">
-            <img
-              className="w-3 h-3"
-              alt="Group"
-              src="https://c.animaapp.com/S4VxTiAY/img/group@2x.png"
-            />
+          <div className="group flex h-3 w-3 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[8px] text-white">
+            i
           </div>
           <div className="line-7"></div>
         </div>
@@ -217,7 +232,7 @@ export const ChatVisualTips2 = ({ currentStep }: ChatVisualTips2Props): JSX.Elem
 
         {/* Screenshots */}
         {tip.screenshots.map((screenshot, index) => (
-          <img
+          <Screenshot
             key={index}
             className={screenshot.className}
             alt={screenshot.alt}

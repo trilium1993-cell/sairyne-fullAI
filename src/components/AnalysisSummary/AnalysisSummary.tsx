@@ -89,31 +89,35 @@ export const AnalysisSummary: React.FC<AnalysisSummaryProps> = ({
 
   return (
     <section className="absolute top-0 left-0 w-[383px] h-[810px] overflow-hidden relative flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 left-0 w-[383px] h-10 bg-[#14141447] backdrop-blur-xl backdrop-brightness-[100%] z-20 flex-shrink-0">
-        <h2 className="absolute top-2.5 left-[calc(50%-48px)] [font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-normal">
-          Project Analysis
-        </h2>
+      {/* Header - как в ProjectAnalysis */}
+      <header className="absolute top-0 left-0 w-[383px] h-10 bg-[#14141447] backdrop-blur-xl backdrop-brightness-[100%] [-webkit-backdrop-filter:blur(24px)_brightness(100%)] z-20">
+        <div className="absolute top-[10px] left-0 right-0 flex items-center justify-center px-3 h-5">
+          {/* Close button in left corner */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="absolute left-3 w-5 h-5 flex items-center justify-center hover:opacity-80 transition-opacity"
+              aria-label="Close project analysis"
+            >
+              <img
+                className="w-[14px] h-[14px]"
+                alt="Close"
+                src={closeIcon}
+              />
+            </button>
+          )}
+          
+          <h2 className="[font-family:'DM_Sans',Helvetica] font-medium text-white text-[13px] tracking-[0] leading-[normal]">
+            Project Analysis
+          </h2>
+        </div>
 
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-2.5 left-3 w-5 h-5 flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity"
-          aria-label="Close Analysis Summary"
-        >
-          <img
-            className="w-[14px] h-[14px]"
-            alt="Close"
-            src={closeIcon}
-          />
-        </button>
-
-        {/* Horizontal line */}
-        <div className="absolute top-[39px] left-0 w-[383px] h-px bg-white/10 z-20" />
+        {/* Horizontal line under header */}
+        <div className="absolute top-[39px] left-0 w-[383px] h-[1px] bg-white/10" />
       </header>
 
       {/* Content wrapper - flex-grow with padding-bottom for sticky footer */}
-      <div className="flex-grow relative pb-[70px] overflow-y-auto">
+      <div className="flex-grow relative pb-[70px] overflow-y-auto" style={{ marginTop: '40px' }}>
         {/* Analysis Summary Title */}
         <h3 className="absolute top-[15px] left-[27px] [font-family:'DM_Sans',Helvetica] font-semibold text-[#f7efff] text-[15px] tracking-[0] leading-[22px]">
           Analysis summary

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Frame } from "../Frame";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
 
 interface Message {
   id: string;
@@ -65,16 +66,16 @@ export const ChatContainer = ({ onNext, onBack }: ChatContainerProps): JSX.Eleme
 
   // Получаем название проекта из localStorage
   useEffect(() => {
-    const selectedProjectData = localStorage.getItem('sairyne_selected_project');
-    if (selectedProjectData) {
-      const selectedProject = JSON.parse(selectedProjectData);
+    const selectedProject = getSelectedProject();
+    if (selectedProject) {
       setProjectName(selectedProject.name);
-    } else {
-      const savedProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      if (savedProjects.length > 0) {
-        const lastProject = savedProjects[savedProjects.length - 1];
-        setProjectName(lastProject.name);
-      }
+      return;
+    }
+
+    const latestProject = getLatestProject();
+    if (latestProject) {
+      setSelectedProject(latestProject);
+      setProjectName(latestProject.name);
     }
   }, []);
 
@@ -132,7 +133,9 @@ export const ChatContainer = ({ onNext, onBack }: ChatContainerProps): JSX.Eleme
 
   const handleSendMessage = () => {
     if (userInput.trim()) {
-      console.log("Sending message:", userInput);
+      if (import.meta.env.DEV) {
+        console.debug('[chatContainer] send', userInput);
+      }
       setUserInput("");
       onNext();
     }
@@ -145,20 +148,21 @@ export const ChatContainer = ({ onNext, onBack }: ChatContainerProps): JSX.Eleme
   };
 
   const handleAnalyze = () => {
-    console.log("Analyze clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chatContainer] analyze');
+    }
   };
 
   const handleLearn = () => {
-    console.log("Learn clicked");
+    if (import.meta.env.DEV) {
+      console.debug('[chatContainer] learn');
+    }
   };
 
   return (
     <div className="relative w-[383px] h-[847px] bg-[#413f42] rounded-[10px] overflow-hidden">
       {/* Header */}
-      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 flex items-center justify-between px-3 h-5">
-        <h1 className="[font-family:'Inter',Helvetica] font-medium text-white text-[13px] text-center tracking-[0] leading-[normal]">
-          Sairyne
-        </h1>
+      <header className="absolute top-[calc(50.00%_-_416px)] left-0 right-0 h-[10px] bg-[#14141447]">
       </header>
 
       <main className="absolute top-[34px] left-[3px] w-[377px] h-[810px] bg-[#141414] rounded-[7px] overflow-hidden">

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Window } from "../../components/Window";
+import { StoredProject, createProject, listProjects, setSelectedProject } from "../../services/projects";
 
 interface CreateYourFirstProjectProps {
   onNext: () => void;
@@ -10,7 +11,7 @@ export const CreateYourFirstProject = ({ onNext, onBack }: CreateYourFirstProjec
   const [projectName, setProjectName] = useState("");
   const [isExactMatch, setIsExactMatch] = useState(false);
   const [isPartialMatch, setIsPartialMatch] = useState(false);
-  const [foundProject, setFoundProject] = useState<any>(null);
+  const [foundProject, setFoundProject] = useState<StoredProject | null>(null);
 
   // Проверяем существование проекта при изменении названия
   const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -18,37 +19,30 @@ export const CreateYourFirstProject = ({ onNext, onBack }: CreateYourFirstProjec
     setProjectName(name);
     
     if (name.trim()) {
-      try {
-        const existingProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-        
-        // Проверяем точное совпадение
-        const exactMatch = existingProjects.find((project: any) => 
-          project.name.toLowerCase() === name.trim().toLowerCase()
-        );
-        
-        if (exactMatch) {
-          setIsExactMatch(true);
-          setIsPartialMatch(false);
-          setFoundProject(exactMatch);
-        } else {
-          // Проверяем частичное совпадение
-          const partialMatch = existingProjects.find((project: any) => 
-            project.name.toLowerCase().includes(name.trim().toLowerCase()) ||
-            name.trim().toLowerCase().includes(project.name.toLowerCase())
-          );
-          
-          if (partialMatch) {
-            setIsExactMatch(false);
-            setIsPartialMatch(true);
-            setFoundProject(partialMatch);
-          } else {
-            setIsExactMatch(false);
-            setIsPartialMatch(false);
-            setFoundProject(null);
-          }
-        }
-      } catch (error) {
-        // В случае ошибки парсинга localStorage, сбрасываем состояние
+      const existingProjects = listProjects();
+
+      const exactMatch = existingProjects.find(
+        (project) => project.name.toLowerCase() === name.trim().toLowerCase()
+      );
+
+      if (exactMatch) {
+        setIsExactMatch(true);
+        setIsPartialMatch(false);
+        setFoundProject(exactMatch);
+        return;
+      }
+
+      const partialMatch = existingProjects.find(
+        (project) =>
+          project.name.toLowerCase().includes(name.trim().toLowerCase()) ||
+          name.trim().toLowerCase().includes(project.name.toLowerCase())
+      );
+
+      if (partialMatch) {
+        setIsExactMatch(false);
+        setIsPartialMatch(true);
+        setFoundProject(partialMatch);
+      } else {
         setIsExactMatch(false);
         setIsPartialMatch(false);
         setFoundProject(null);
@@ -68,25 +62,9 @@ export const CreateYourFirstProject = ({ onNext, onBack }: CreateYourFirstProjec
       return;
     }
 
-    try {
-      // Сохраняем название проекта в localStorage
-      const existingProjects = JSON.parse(localStorage.getItem('sairyne_projects') || '[]');
-      
-      const newProject = {
-        id: Date.now(),
-        name: projectName.trim(),
-        createdAt: new Date().toISOString()
-      };
-      
-      existingProjects.push(newProject);
-      localStorage.setItem('sairyne_projects', JSON.stringify(existingProjects));
-      
-      // Переходим к экрану YourProjects
-      onNext();
-    } catch (error) {
-      // В случае ошибки все равно переходим дальше
-      onNext();
-    }
+    const newProject = createProject(projectName.trim());
+    setSelectedProject(newProject);
+    onNext();
   };
 
   const handleClose = () => {
@@ -99,8 +77,7 @@ export const CreateYourFirstProject = ({ onNext, onBack }: CreateYourFirstProjec
 
   const handleGoToProject = () => {
     if (foundProject) {
-      // Переходим к YourProjects с выделенным проектом
-      localStorage.setItem('sairyne_selected_project', JSON.stringify(foundProject));
+      setSelectedProject(foundProject);
       onNext();
     }
   };
