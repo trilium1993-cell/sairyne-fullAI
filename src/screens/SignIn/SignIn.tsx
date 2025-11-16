@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Window } from "../../components/Window";
+import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { createSession, findUserByEmail, getCurrentUser } from "../../services/auth";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
 
@@ -82,6 +83,7 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
   return (
     <>
+      <MasterChannelNotice />
       <Window
         title="Sairyne"
         onMinimize={() => {/* minimize logic */}}
