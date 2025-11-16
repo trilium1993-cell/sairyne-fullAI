@@ -1,5 +1,6 @@
 import ScreenManager from "./components/ScreenManager";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { MasterChannelNotice } from "./components/MasterChannelNotice";
 import "../tailwind.css";
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
         backgroundColor: '#0b0a0f'
       }}>
         <ScreenManager />
+        <MasterChannelNotice />
       </div>
     </ErrorBoundary>
   );
