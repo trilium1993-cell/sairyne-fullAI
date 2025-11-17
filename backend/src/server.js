@@ -28,6 +28,7 @@ const allowedOrigins = [
   'https://sairyne-full-ai.vercel.app',
   'https://www.sairyne-full-ai.vercel.app',
   'https://sairyne-full5.onrender.com',
+  'https://sairyne-fullai-5.onrender.com',
   'http://localhost:3000',
   'http://localhost:5173'
 ];
