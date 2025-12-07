@@ -37,14 +37,30 @@ if (isDevelopment) {
   console.log('  PORT:', PORT);
 }
 
+// DEBUG MODE: Fully open CORS for WebView2 debugging
+// TODO: In production, switch to strict whitelist below
+const corsOptions = {
+  origin: true, // Allow ALL origins (for WebView2 testing)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  optionsSuccessStatus: 204
+};
+
+if (isDevelopment) {
+  console.log('⚠️ CORS MODE: OPEN FOR DEBUG (all origins allowed)');
+}
+
+// STRICT MODE - uncomment in production
+/*
 const corsOptions = {
   origin: (origin, callback) => {
     if (isDevelopment) {
       console.log('🌐 Incoming request Origin:', origin);
     }
-    // Allow no-origin (JUCE, curl, internal, Postman)
+    // Allow no-origin (JUCE, curl, internal, Postman, WebView2)
     if (!origin) {
-      console.log('✅ No origin - allowing (JUCE/curl/internal request)');
+      console.log('✅ No origin - allowing (JUCE/WebView2/curl/internal)');
       return callback(null, true);
     }
     // Check if origin is in allowedOrigins
@@ -52,16 +68,17 @@ const corsOptions = {
       console.log(`✅ Origin allowed: ${origin}`);
       return callback(null, true);
     }
-    // Temporary: Allow all origins for debugging
-    // TODO: Remove this in production, revert to callback(null, false)
-    console.log(`⚠️ Origin not in whitelist but allowing for debug: ${origin}`);
-    return callback(null, true);
+    if (isDevelopment) {
+      console.warn(`⚠️ Origin blocked: ${origin}`);
+    }
+    return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true,
   optionsSuccessStatus: 204
 };
+*/
 
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
