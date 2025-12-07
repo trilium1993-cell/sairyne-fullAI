@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sairyne-fullai-5
+    env: node
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://sairyne-ai.vercel.app,https://sairyne-full-ai.vercel.app,http://localhost:5173,http://localhost:3000
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: PORT
+        value: "10000"
+      - key: NODE_ENV
+        value: production
+
