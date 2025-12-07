@@ -13,16 +13,8 @@ if (isDevelopment) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Debug: Log environment variables (development only)
-if (isDevelopment) {
-  console.log('🔍 Environment Check:');
-  console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING');
-  console.log('  CORS_ORIGIN:', process.env.CORS_ORIGIN || 'http://localhost:5173 (default)');
-  console.log('  PORT:', PORT);
-}
-
-// Middleware
-const allowedOrigins = [
+// Parse CORS_ORIGINS from environment variable or use defaults
+const defaultOrigins = [
   'https://sairyne-ai.vercel.app',
   'https://www.sairyne-ai.vercel.app',
   'https://sairyne-full-ai.vercel.app',
@@ -32,6 +24,18 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173'
 ];
+
+const allowedOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
+  : defaultOrigins;
+
+// Debug: Log environment variables (development only)
+if (isDevelopment) {
+  console.log('🔍 Environment Check:');
+  console.log('  OPENAI_API_KEY:', process.env.OPENAI_API_KEY ? '✅ SET' : '❌ MISSING');
+  console.log('  CORS_ORIGINS:', process.env.CORS_ORIGINS ? '✅ SET from env' : '❌ Using defaults');
+  console.log('  PORT:', PORT);
+}
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -186,7 +190,7 @@ app.post('/api/chat/message', async (req, res) => {
 app.listen(PORT, () => {
   if (isDevelopment) {
     console.log(`🚀 Backend server running on port ${PORT}`);
-    console.log(`✅ Allowed origins: ${[...allowedOrigins, process.env.CORS_ORIGIN].filter(Boolean).join(', ')}`);
+    console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
     console.log(`🤖 OpenAI API key: ${openaiApiKey ? 'Configured ✅' : 'Missing ❌'}`);
   }
 });
