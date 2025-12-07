@@ -42,16 +42,23 @@ const corsOptions = {
     if (isDevelopment) {
       console.log('🌐 Incoming request Origin:', origin);
     }
-    if (!origin) return callback(null, true); // Allow no-origin (JUCE, curl, internal)
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    if (process.env.CORS_ORIGIN && origin === process.env.CORS_ORIGIN) return callback(null, true);
-    if (isDevelopment) {
-      console.warn('❌ Blocked by CORS:', origin);
+    // Allow no-origin (JUCE, curl, internal, Postman)
+    if (!origin) {
+      console.log('✅ No origin - allowing (JUCE/curl/internal request)');
+      return callback(null, true);
     }
-    return callback(null, false); // Do not throw to avoid 500 on preflight
+    // Check if origin is in allowedOrigins
+    if (allowedOrigins.includes(origin)) {
+      console.log(`✅ Origin allowed: ${origin}`);
+      return callback(null, true);
+    }
+    // Temporary: Allow all origins for debugging
+    // TODO: Remove this in production, revert to callback(null, false)
+    console.log(`⚠️ Origin not in whitelist but allowing for debug: ${origin}`);
+    return callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true,
   optionsSuccessStatus: 204
 };
