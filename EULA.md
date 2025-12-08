@@ -208,7 +208,7 @@ If any provision is found invalid, the remaining provisions continue in effect.
 
 ## 14. Entire Agreement
 
-This EULA, along with our Privacy Policy, constitutes the entire agreement between us regarding the Software.
+This EULA, along with our **Privacy Policy** (see `PRIVACY_POLICY.md`), constitutes the entire agreement between us regarding the Software.
 
 ---
 

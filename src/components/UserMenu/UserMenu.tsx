@@ -10,6 +10,7 @@ interface UserMenuProps {
 export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Element | null => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [showEulaModal, setShowEulaModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   const handleLeaveFeedback = () => {
     const feedbackUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeUkIn9y-ZyWIjv03umKLl8x-NcD-JIoTDOneHPmHTciu6VpQ/viewform?usp=dialog";
@@ -94,6 +95,11 @@ Thank you for reporting!
     setShowEulaModal(true);
   };
 
+  const handleShowPrivacy = () => {
+    console.log('[UserMenu] Show Privacy Policy clicked');
+    setShowPrivacyModal(true);
+  };
+
   // Обработка клика вне окна
   useEffect(() => {
     if (!isOpen) return;
@@ -128,7 +134,7 @@ Thank you for reporting!
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen && !showEulaModal) return null;
+  if (!isOpen && !showEulaModal && !showPrivacyModal) return null;
 
   return (
     <>
@@ -187,6 +193,16 @@ Thank you for reporting!
                   EULA & Legal
                 </span>
               </button>
+
+              <button
+                onClick={handleShowPrivacy}
+                className="w-full text-left py-2.5 px-0 cursor-pointer hover:opacity-80 transition-opacity"
+                role="menuitem"
+              >
+                <span className="[font-family:'DM_Sans',Helvetica] font-medium text-white/70 text-[12px] tracking-[0] leading-[18px] whitespace-nowrap">
+                  Privacy Policy
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -241,6 +257,76 @@ Thank you for reporting!
             <div className="flex gap-2 p-4 border-t border-white/10 justify-end">
               <button
                 onClick={() => setShowEulaModal(false)}
+                className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur">
+          <div className="relative w-[90%] max-w-2xl max-h-[80vh] bg-[#1a1a23] rounded-lg border border-white/10 flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
+              <h2 className="text-white font-semibold">Privacy Policy</h2>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="text-white/60 hover:text-white transition-colors"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content - scrollable */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="text-white/80 text-sm space-y-4 font-light leading-relaxed">
+                <p><strong>Last updated: December 2025</strong></p>
+                
+                <p>
+                  We collect data to improve Sairyne and communicate with you about updates.
+                </p>
+
+                <h3 className="text-white font-semibold mt-4">Information We Collect</h3>
+                <ul className="list-disc list-inside space-y-2 text-white/70">
+                  <li>Contact data (email, messages you submit)</li>
+                  <li>Usage data (device info, pages visited, timestamps)</li>
+                  <li>Audio analysis data (sent to OpenAI for AI features)</li>
+                </ul>
+
+                <h3 className="text-white font-semibold mt-4">Your Rights</h3>
+                <ul className="list-disc list-inside space-y-2 text-white/70">
+                  <li>Access, correct, or delete your data</li>
+                  <li>Opt out of marketing emails</li>
+                  <li>Withdraw consent anytime</li>
+                  <li>Lodge a complaint with your data protection authority</li>
+                </ul>
+
+                <h3 className="text-white font-semibold mt-4">Contact</h3>
+                <p className="text-white/70">
+                  Privacy questions? Email: <span className="text-white">contact@sairyne.com</span>
+                </p>
+
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded p-3 my-4">
+                  <p className="text-blue-200 text-xs">
+                    <strong>Important:</strong> When you use AI features, your data is sent to OpenAI. See their Privacy Policy: openai.com/privacy
+                  </p>
+                </div>
+
+                <p className="text-white/60 text-xs">
+                  For the complete Privacy Policy, see the full documentation.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-2 p-4 border-t border-white/10 justify-end">
+              <button
+                onClick={() => setShowPrivacyModal(false)}
                 className="px-4 py-2 rounded bg-white/10 hover:bg-white/20 text-white text-sm transition-colors"
               >
                 Close

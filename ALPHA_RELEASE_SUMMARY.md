@@ -28,7 +28,24 @@ This document summarizes the work completed to prepare Sairyne for ALPHA release
 
 ---
 
-### 2. Feedback & Bug Reporting ✅
+### 2. Legal Documents ✅
+
+**Created:**
+- `EULA.md` - Complete End-User License Agreement
+- `PRIVACY_POLICY.md` - Privacy Policy with GDPR/CCPA compliance
+
+**Features:**
+- GDPR Article references (Data Controller, Legal Bases, Rights)
+- CCPA California Privacy Rights
+- Cookie Policy embedded
+- Data retention schedule
+- International transfer safeguards
+- Children's privacy clause
+- OpenAI integration privacy notice
+
+---
+
+### 3. Feedback & Bug Reporting ✅
 
 **Created:**
 - "Report a bug" button with email template
@@ -92,8 +109,10 @@ retryWithBackoff(fn, maxRetries)   // Automatic retry logic
 
 **Modified: `src/components/UserMenu/UserMenu.tsx`**
 - Added "Report a bug" button
-- Added "EULA & Legal" button  
+- Added "EULA & Legal" button
+- Added "Privacy Policy" button
 - EULA modal with scrollable content
+- Privacy Policy modal with key points
 - Styled consistently with plugin theme
 - Non-blocking interaction
 
@@ -104,7 +123,8 @@ retryWithBackoff(fn, maxRetries)   // Automatic retry logic
 ├── Leave feedback
 ├── Report a bug
 ├── ────────────
-└── EULA & Legal  → Opens scrollable modal
+├── EULA & Legal  → Opens scrollable modal
+└── Privacy Policy → Opens scrollable modal
 ```
 
 ---
@@ -145,9 +165,10 @@ CORS_ORIGINS: https://sairyne-ai.vercel.app,https://www.sairyne-ai.vercel.app,ht
 
 ## 📊 Changes Summary
 
-### New Files (6)
+### New Files (7)
 ```
-EULA.md                           # Legal document
+EULA.md                           # Legal document (license terms)
+PRIVACY_POLICY.md                 # Privacy Policy (GDPR, CCPA, data handling)
 docs/ALPHA_INVENTORY.md          # Technical overview
 docs/ALPHA_CHECKLIST.md          # Testing & release guide
 src/utils/networkErrors.ts       # Network error utilities

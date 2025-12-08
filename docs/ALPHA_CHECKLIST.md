@@ -37,6 +37,7 @@ This checklist ensures Sairyne is ready for early access / ALPHA release on macO
 
 ```
 EULA.md                               # End-User License Agreement
+PRIVACY_POLICY.md                     # Privacy Policy & Cookie Policy & GDPR compliance
 docs/ALPHA_INVENTORY.md              # Project structure & technical overview
 docs/ALPHA_CHECKLIST.md              # This file
 src/utils/networkErrors.ts           # Network error classification & timeout utilities
