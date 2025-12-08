@@ -250,6 +250,15 @@ Thank you for reporting!
                     <strong>Alpha Notice:</strong> This is an early version. Please report bugs via the "Report a bug" option.
                   </p>
                 </div>
+
+                <div className="border-t border-white/10 mt-4 pt-4">
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    © 2025 ТОВ «Sairyne Tech». Усі права захищено.
+                  </p>
+                  <p className="text-white/50 text-xs mt-2">
+                    Sairyne and the Sairyne Assistant plugin are owned and developed by ТОВ «Sairyne Tech».
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -320,6 +329,15 @@ Thank you for reporting!
                 <p className="text-white/60 text-xs">
                   For the complete Privacy Policy, see the full documentation.
                 </p>
+
+                <div className="border-t border-white/10 mt-4 pt-4">
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    © 2025 ТОВ «Sairyne Tech». Усі права захищено.
+                  </p>
+                  <p className="text-white/50 text-xs mt-2">
+                    Sairyne is owned and developed by ТОВ «Sairyne Tech».
+                  </p>
+                </div>
               </div>
             </div>
 

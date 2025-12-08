@@ -318,3 +318,13 @@ If you have any questions, contact: **contact@sairyne.com**
 **Last Updated**: December 2025  
 **Status**: Active
 
+---
+
+## Ownership & Copyright
+
+© 2025 ТОВ «Sairyne Tech». Усі права захищено.
+
+© 2025 Sairyne Tech LLC. All rights reserved.
+
+Sairyne is owned and developed by ТОВ «Sairyne Tech».
+

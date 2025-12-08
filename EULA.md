@@ -234,4 +234,16 @@ For questions, complaints, or support:
 
 **Thank you for using Sairyne! Happy producing.** 🎵
 
+---
+
+## Ownership & Copyright
+
+© 2025 ТОВ «Sairyne Tech». Усі права захищено.
+
+© 2025 Sairyne Tech LLC. All rights reserved.
+
+Sairyne and the Sairyne Assistant plugin are owned and developed by ТОВ «Sairyne Tech».
+
+This software is licensed, not sold. All intellectual property rights remain with ТОВ «Sairyne Tech».
+
 
