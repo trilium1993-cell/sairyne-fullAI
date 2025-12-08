@@ -294,11 +294,12 @@ When releasing to early access users, include:
    - Or email trilium1993@gmail.com
    - Include DAW version, steps to reproduce
 
-4. **Privacy**:
+4. **Privacy & Support**:
    - Audio analysis sent to OpenAI servers
    - See OpenAI Privacy Policy
    - Backend may log usage data
    - Sairyne does not sell data
+   - Contact: contact@sairyne.com
 
 ---
 
@@ -343,9 +344,10 @@ When releasing to early access users, include:
 ## 📞 Support & Contact
 
 **For bug reports & feedback**:
-- 📧 Email: trilium1993@gmail.com
+- 📧 Email: contact@sairyne.com
 - 🎤 In-app: Click ⚙️ → "Report a bug" or "Leave feedback"
 - 🌐 Website: https://www.sairyne.net
+- 💼 Business inquiries: business@sairyne.com
 
 **Emergency (backend down)**:
 - Check https://dashboard.render.com/services/sairyne-fullai-5

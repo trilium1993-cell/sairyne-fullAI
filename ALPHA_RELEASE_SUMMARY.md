@@ -329,9 +329,10 @@ Before going to production (not ALPHA):
 ## 📞 Support & Contacts
 
 **For Issues or Questions**:
-- 📧 trilium1993@gmail.com
+- 📧 contact@sairyne.com
 - 🐛 Bug reports: Use "Report a bug" button in app
 - 💬 Feedback: Use "Leave feedback" button in app
+- 💼 Business inquiries: business@sairyne.com
 
 **Backend Support**:
 - Monitor: https://dashboard.render.com/services/sairyne-fullai-5

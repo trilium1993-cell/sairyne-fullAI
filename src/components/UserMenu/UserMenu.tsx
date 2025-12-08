@@ -76,7 +76,7 @@ System Info:
 Thank you for reporting!
     `.trim();
 
-    const mailtoUrl = `mailto:trilium1993@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoUrl = `mailto:contact@sairyne.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
     console.log('[UserMenu] Report bug clicked');
     

@@ -222,11 +222,13 @@ This EULA is governed by the laws of [Your Jurisdiction], without regard to conf
 
 For questions, complaints, or support:
 
-📧 **Email**: trilium1993@gmail.com
+📧 **Email**: contact@sairyne.com
 
 💬 **In-App Feedback**: Use the "Send Feedback" or "Report a Bug" button in the plugin
 
 🌐 **Website**: https://www.sairyne.net
+
+**For Business Inquiries**: business@sairyne.com
 
 ---
 
