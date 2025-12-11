@@ -1195,10 +1195,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   }
                 }}
                 placeholder="Message... (Shift+Enter for new line)"
-                className="absolute top-[10px] left-[12px] right-[10px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none max-h-[90px] overflow-y-auto"
+                className="absolute top-[10px] left-[12px] right-[10px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none overflow-y-auto"
                 style={{ 
                   width: 'calc(100% - 100px)',
-                  height: 'calc(100% - 20px)',
+                  height: '96px',
+                  maxHeight: '96px',
                   fontFamily: 'var(--body-font-family)',
                   fontSize: 'var(--body-font-size)',
                   fontStyle: 'var(--body-font-style)',
@@ -1207,7 +1208,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   lineHeight: 'var(--body-line-height)',
                   whiteSpace: 'pre-wrap',
                   wordWrap: 'break-word',
-                  overflowWrap: 'break-word'
+                  overflowWrap: 'break-word',
+                  padding: '0',
+                  boxSizing: 'border-box'
                 }}
               />
 
