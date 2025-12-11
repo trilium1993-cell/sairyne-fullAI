@@ -53,8 +53,9 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
   const handleReportBug = () => {
     console.log('[UserMenu] Report bug clicked');
     
-    // Open Sairyne website bug report page
-    const bugReportUrl = 'https://www.sairyne.net/bug-report';
+    // Open Sairyne bug report Google Form
+    // Replace this URL with your own Google Form link
+    const bugReportUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSfExample/viewform';
     
     if (typeof window !== 'undefined') {
       // Try to open in new window/tab
