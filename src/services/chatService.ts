@@ -30,14 +30,20 @@ export class ChatService {
         console.debug('[chat] POST', url);
       }
       
+      // SECURITY: Include plugin client identifier header
+      // This helps the backend distinguish requests from the VST plugin
+      // and apply appropriate rate limiting / validation
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Sairyne-Client': 'vst3-web', // Identifies this as a Sairyne plugin request
+      };
+      
       // Use fetch with timeout
       const response = await fetchWithTimeout(
         url,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             message,
             conversationHistory: conversationHistory.slice(-10) // Last 10 messages for context
