@@ -212,24 +212,4 @@ export async function retryWithBackoff<T>(
   throw lastError;
 }
 
-/**
- * Offline mode detection and management
- * Tracks weak connections and offline state
- */
-export const offlineMode = {
-  isWeakConnection: false,
-  
-  markWeakConnection(): void {
-    this.isWeakConnection = true;
-  },
-  
-  clearWeakConnection(): void {
-    this.isWeakConnection = false;
-  },
-  
-  isOffline(): boolean {
-    return !isOnline() || this.isWeakConnection;
-  }
-};
-
 

@@ -1,5 +1,6 @@
 import { API_URL, API_ENDPOINTS } from '../config/api';
-import { fetchWithTimeout, classifyHttpError, getErrorMessage, offlineMode } from '../utils/networkErrors';
+import { fetchWithTimeout, classifyHttpError, getErrorMessage } from '../utils/networkErrors';
+import { offlineMode } from '../utils/offlineMode';
 
 interface ChatMessage {
   type: 'user' | 'ai';
