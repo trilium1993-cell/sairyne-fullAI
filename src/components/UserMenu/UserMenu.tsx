@@ -51,38 +51,19 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
   };
 
   const handleReportBug = () => {
-    const subject = 'Sairyne Alpha Bug Report';
-    const body = `
-Bug Description:
-[Please describe what went wrong]
-
-Steps to Reproduce:
-1. 
-2. 
-3. 
-
-Expected Behavior:
-[What should happen]
-
-Actual Behavior:
-[What actually happened]
-
-System Info:
-- OS: macOS / Windows
-- DAW: [Logic Pro / Ableton / etc.]
-- DAW Version: 
-- Sairyne Version: Alpha
-
----
-Thank you for reporting!
-    `.trim();
-
-    const mailtoUrl = `mailto:contact@sairyne.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
     console.log('[UserMenu] Report bug clicked');
     
+    // Open Sairyne website bug report page
+    const bugReportUrl = 'https://www.sairyne.net/bug-report';
+    
     if (typeof window !== 'undefined') {
-      window.location.href = mailtoUrl;
+      // Try to open in new window/tab
+      const opened = window.open(bugReportUrl, '_blank');
+      
+      // Fallback: if popup blocked, navigate directly
+      if (!opened) {
+        window.location.href = bugReportUrl;
+      }
     }
     
     if (onClose) {
