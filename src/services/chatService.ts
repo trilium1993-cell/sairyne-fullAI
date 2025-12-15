@@ -1,6 +1,4 @@
 import { API_URL, API_ENDPOINTS } from '../config/api';
-import { fetchWithTimeout, classifyHttpError, getErrorMessage } from '../utils/networkErrors';
-import { offlineMode } from '../utils/offlineMode';
 
 interface ChatMessage {
   type: 'user' | 'ai';
@@ -12,70 +10,42 @@ interface ChatResponse {
   timestamp: number;
 }
 
-const CHAT_REQUEST_TIMEOUT_MS = 30000; // 30 seconds for AI responses (longer than default)
-const HEALTH_CHECK_TIMEOUT_MS = 10000; // 10 seconds for health check
-
 export class ChatService {
   /**
-   * Send message to AI backend with timeout and error handling
+   * Send message to AI backend
    */
   static async sendMessage(
     message: string,
     conversationHistory: ChatMessage[] = []
   ): Promise<string> {
-    const isDev = import.meta.env.DEV;
-    
     try {
+      const isDev = import.meta.env.DEV;
       const url = `${API_URL}${API_ENDPOINTS.CHAT_MESSAGE}`;
       if (isDev) {
         console.debug('[chat] POST', url);
       }
       
-      // SECURITY: Include plugin client identifier header
-      // This helps the backend distinguish requests from the VST plugin
-      // and apply appropriate rate limiting / validation
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Sairyne-Client': 'vst3-web', // Identifies this as a Sairyne plugin request
-      };
-      
-      // Use fetch with timeout
-      const response = await fetchWithTimeout(
-        url,
-        {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            message,
-            conversationHistory: conversationHistory.slice(-10) // Last 10 messages for context
-          }),
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        CHAT_REQUEST_TIMEOUT_MS
-      );
+        body: JSON.stringify({
+          message,
+          conversationHistory: conversationHistory.slice(-10) // Last 10 messages for context
+        }),
+      });
 
       if (isDev) {
         console.debug('[chat] status', response.status);
       }
 
-      // Clear weak connection flag on success
-      offlineMode.clearWeakConnection();
-
       if (!response.ok) {
-        // Try to parse error details
-        let errorData = {};
-        try {
-          errorData = await response.json();
-        } catch (parseError) {
-          // If we can't parse JSON, that's OK, we'll use HTTP status
-        }
-
-        const networkError = classifyHttpError(response.status, response.statusText);
-        const errorMessage = errorData?.error || networkError.message;
-        
+        const errorData = await response.json().catch(() => ({}));
         if (isDev) {
-          console.error('[chat] error response', { status: response.status, error: errorMessage });
+          console.error('[chat] error response', errorData);
         }
-        throw new Error(errorMessage);
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
       const data: ChatResponse = await response.json();
@@ -84,56 +54,24 @@ export class ChatService {
       }
       return data.response;
     } catch (error) {
-      // Mark weak connection if it's a timeout
-      if (error instanceof Error && error.message.includes('timeout')) {
-        offlineMode.markWeakConnection();
+      if (import.meta.env.DEV) {
+        console.error('[chat] request failed', error);
       }
-
-      if (isDev) {
-        console.error('[chat] request failed:', error);
-      }
-      
-      // Re-throw with classification
       throw error;
     }
   }
 
   /**
-   * Check backend health with timeout
+   * Check backend health
    */
   static async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetchWithTimeout(
-        `${API_URL}${API_ENDPOINTS.HEALTH}`,
-        {},
-        HEALTH_CHECK_TIMEOUT_MS
-      );
-
-      if (response.ok) {
-        offlineMode.clearWeakConnection();
-        return true;
-      }
-
-      // Server responded but with error status
-      return false;
+      const response = await fetch(`${API_URL}${API_ENDPOINTS.HEALTH}`);
+      return response.ok;
     } catch (error) {
-      // Mark weak connection on timeout
-      if (error instanceof Error && error.message.includes('timeout')) {
-        offlineMode.markWeakConnection();
-      }
-
-      if (import.meta.env.DEV) {
-        console.error('[chat] health check failed:', error);
-      }
+      console.error('Backend health check failed:', error);
       return false;
     }
-  }
-
-  /**
-   * Get a user-friendly error message for display
-   */
-  static getErrorMessage(error: unknown): string {
-    return getErrorMessage(error);
   }
 }
 

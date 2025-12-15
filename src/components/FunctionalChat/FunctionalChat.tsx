@@ -1185,32 +1185,26 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                 transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
               }}
             >
-              <textarea
+              <input
+                type="text"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (e.key === 'Enter') {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
-                placeholder="Message... (Shift+Enter for new line)"
-                className="absolute top-[10px] left-[12px] right-[10px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none overflow-y-auto"
+                placeholder="Message..."
+                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
                 style={{ 
                   width: 'calc(100% - 100px)',
-                  height: '70px',
-                  maxHeight: '70px',
                   fontFamily: 'var(--body-font-family)',
                   fontSize: 'var(--body-font-size)',
                   fontStyle: 'var(--body-font-style)',
                   fontWeight: 'var(--body-font-weight)',
                   letterSpacing: 'var(--body-letter-spacing)',
-                  lineHeight: 'var(--body-line-height)',
-                  whiteSpace: 'pre-wrap',
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
-                  padding: '0',
-                  boxSizing: 'border-box'
+                  lineHeight: 'var(--body-line-height)'
                 }}
               />
 

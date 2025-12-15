@@ -121,16 +121,4 @@ Proprietary. All rights reserved.
 
 ---
 
-## ⚖️ Legal
-
-© 2025 ТОВ «Sairyne Tech». Усі права захищено.
-
-© 2025 Sairyne Tech LLC. All rights reserved.
-
-Sairyne and the Sairyne Assistant plugin are owned and developed by ТОВ «Sairyne Tech».
-
-Sairyne Tech is the sole owner of all intellectual property related to this software, including the plugin code, branding, and AI-assisted workflows.
-
----
-
 **Made with ❤️ for music producers**

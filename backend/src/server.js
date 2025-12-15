@@ -2,64 +2,22 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import mongoose from 'mongoose';
+import authRoutes from './routes/auth.js';
+import emailService from './services/emailService.js';
 
 // Load environment variables
 dotenv.config();
 const isDevelopment = process.env.NODE_ENV !== 'production';
-
-// ============================================================================
-// SECURITY: Rate Limiting (simple in-memory implementation for MVP)
-// For production with multiple instances, use Redis + express-rate-limit
-// ============================================================================
-const requestCounts = new Map(); // { ip: { count, resetTime } }
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 100; // Per IP per minute
-
-function rateLimitMiddleware(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress || 'unknown';
-  const now = Date.now();
-  
-  if (!requestCounts.has(ip)) {
-    requestCounts.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
-    return next();
-  }
-  
-  const record = requestCounts.get(ip);
-  if (now > record.resetTime) {
-    record.count = 1;
-    record.resetTime = now + RATE_LIMIT_WINDOW_MS;
-    return next();
-  }
-  
-  record.count++;
-  if (record.count > RATE_LIMIT_MAX_REQUESTS) {
-    if (isDevelopment) {
-      console.warn(`⚠️ Rate limit exceeded for IP: ${ip} (${record.count} requests)`);
-    }
-    return res.status(429).json({ 
-      error: 'Too many requests. Please try again later.',
-      retryAfter: Math.ceil((record.resetTime - now) / 1000)
-    });
-  }
-  
-  next();
-}
-
-// Clean up rate limit records periodically to prevent memory leaks
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, record] of requestCounts.entries()) {
-    if (now > record.resetTime) {
-      requestCounts.delete(ip);
-    }
-  }
-}, 5 * 60 * 1000); // Every 5 minutes
 
 if (isDevelopment) {
   console.log("🌀 Sairyne backend restarting — fresh CORS build");
 }
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Initialize email service
+await emailService.initialize();
 
 // Parse CORS_ORIGINS from environment variable or use defaults
 const defaultOrigins = [
@@ -85,79 +43,52 @@ if (isDevelopment) {
   console.log('  PORT:', PORT);
 }
 
-// ============================================================================
-// SECURITY: CORS Configuration
-// Development: Allow localhost for testing
-// Production: Strict whitelist of allowed origins
-// ============================================================================
+// DEBUG MODE: Fully open CORS for WebView2 debugging
+// TODO: In production, switch to strict whitelist below
+const corsOptions = {
+  origin: true, // Allow ALL origins (for WebView2 testing)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  optionsSuccessStatus: 204
+};
+
+if (isDevelopment) {
+  console.log('⚠️ CORS MODE: OPEN FOR DEBUG (all origins allowed)');
+}
+
+// STRICT MODE - uncomment in production
+/*
 const corsOptions = {
   origin: (origin, callback) => {
     if (isDevelopment) {
       console.log('🌐 Incoming request Origin:', origin);
     }
-    
-    // Allow no-origin (JUCE plugin, internal requests, curl, Postman)
-    // WebView in the plugin may not send an origin header
+    // Allow no-origin (JUCE, curl, internal, Postman, WebView2)
     if (!origin) {
-      if (isDevelopment) {
-        console.log('✅ No origin - allowing (plugin/internal/WebView)');
-      }
+      console.log('✅ No origin - allowing (JUCE/WebView2/curl/internal)');
       return callback(null, true);
     }
-    
-    // Check if origin is in allowedOrigins whitelist
+    // Check if origin is in allowedOrigins
     if (allowedOrigins.includes(origin)) {
-      if (isDevelopment) {
-        console.log(`✅ Origin allowed: ${origin}`);
-      }
+      console.log(`✅ Origin allowed: ${origin}`);
       return callback(null, true);
     }
-    
-    // Reject unknown origins
     if (isDevelopment) {
-      console.warn(`⚠️ Origin blocked (not in whitelist): ${origin}`);
-    } else {
-      console.warn(`[SECURITY] CORS block: ${origin}`);
+      console.warn(`⚠️ Origin blocked: ${origin}`);
     }
     return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Sairyne-Client'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true,
   optionsSuccessStatus: 204
 };
+*/
 
-// ============================================================================
-// SECURITY: Middleware Stack
-// Order matters: CORS → Rate limiting → body parsing → routes
-// ============================================================================
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-
-// Limit request body size to prevent abuse
-app.use(express.json({ limit: '10kb' }));
-
-// Apply rate limiting to all routes
-app.use(rateLimitMiddleware);
-
-// ============================================================================
-// SECURITY: Request Validation Middleware
-// Optionally validate X-Sairyne-Client header to identify plugin requests
-// ============================================================================
-function validateSairyneClient(req, res, next) {
-  const clientHeader = req.headers['x-sairyne-client'];
-  
-  // Log the client identifier for security monitoring
-  if (isDevelopment && clientHeader) {
-    console.log(`[SECURITY] Request from client: ${clientHeader}`);
-  }
-  
-  // We accept requests without this header (for backward compatibility and testing),
-  // but we log it for monitoring purposes
-  next();
-}
-
-app.use(validateSairyneClient);
+app.use(express.json());
 
 // Lightweight test endpoint
 app.get('/api/test', (req, res) => {
@@ -173,54 +104,6 @@ if (!openaiApiKey && isDevelopment) {
 const openai = openaiApiKey
   ? new OpenAI({ apiKey: openaiApiKey })
   : null;
-
-// ============================================================================
-// SECURITY: Input Validation & Cost Protection
-// ============================================================================
-const MAX_MESSAGE_LENGTH = 5000; // Characters
-const MAX_CONVERSATION_HISTORY = 20; // Messages
-const MAX_TOTAL_TOKENS_ESTIMATE = 4000; // Rough estimate for safety
-
-function validateChatInput(message, conversationHistory) {
-  const errors = [];
-  
-  // Validate message
-  if (!message || typeof message !== 'string') {
-    errors.push('Message must be a non-empty string');
-  } else if (message.trim().length === 0) {
-    errors.push('Message cannot be empty or whitespace only');
-  } else if (message.length > MAX_MESSAGE_LENGTH) {
-    errors.push(`Message exceeds max length of ${MAX_MESSAGE_LENGTH} characters`);
-  }
-  
-  // Validate conversation history
-  if (!Array.isArray(conversationHistory)) {
-    errors.push('Conversation history must be an array');
-  } else if (conversationHistory.length > MAX_CONVERSATION_HISTORY) {
-    errors.push(`Conversation history exceeds max length of ${MAX_CONVERSATION_HISTORY} messages`);
-  } else {
-    // Validate each message in history
-    for (let i = 0; i < conversationHistory.length; i++) {
-      const msg = conversationHistory[i];
-      if (!msg.type || !['user', 'ai'].includes(msg.type)) {
-        errors.push(`Message ${i}: invalid type (must be 'user' or 'ai')`);
-      }
-      if (!msg.content || typeof msg.content !== 'string') {
-        errors.push(`Message ${i}: content must be a non-empty string`);
-      }
-      if (msg.content.length > MAX_MESSAGE_LENGTH) {
-        errors.push(`Message ${i}: content exceeds max length`);
-      }
-    }
-  }
-  
-  return errors;
-}
-
-// Estimate tokens (rough approximation: 1 token ≈ 4 characters)
-function estimateTokens(text) {
-  return Math.ceil(text.length / 4);
-}
 
 // System prompt for Ableton expert
 const SYSTEM_PROMPT = `You are an expert Ableton Live music production assistant specializing in House music. 
@@ -268,46 +151,17 @@ app.post('/analytics/event', (req, res) => {
   res.status(202).json({ status: 'accepted' });
 });
 
-// ============================================================================
-// Chat Endpoint with Security: Input validation, cost protection, error handling
-// ============================================================================
+// Chat endpoint
 app.post('/api/chat/message', async (req, res) => {
-  const requestId = Math.random().toString(36).substr(2, 9); // For logging
-  
   try {
     const { message, conversationHistory = [] } = req.body;
-    
-    // SECURITY: Validate input
-    const validationErrors = validateChatInput(message, conversationHistory);
-    if (validationErrors.length > 0) {
-      if (isDevelopment) {
-        console.warn(`[${requestId}] Validation errors:`, validationErrors);
-      }
-      return res.status(400).json({ 
-        error: 'Invalid request',
-        details: validationErrors[0] // Return first error to user
-      });
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
     }
 
     if (!openai) {
-      return res.status(503).json({ 
-        error: 'AI service temporarily unavailable. Please configure OPENAI_API_KEY.' 
-      });
-    }
-
-    // SECURITY: Estimate tokens before calling API
-    const messageTokens = estimateTokens(message);
-    const historyTokens = conversationHistory.reduce((sum, msg) => sum + estimateTokens(msg.content), 0);
-    const systemTokens = estimateTokens(SYSTEM_PROMPT);
-    const totalEstimatedTokens = messageTokens + historyTokens + systemTokens + 300; // +300 for response
-    
-    if (totalEstimatedTokens > MAX_TOTAL_TOKENS_ESTIMATE) {
-      if (isDevelopment) {
-        console.warn(`[${requestId}] Token estimate (${totalEstimatedTokens}) exceeds max (${MAX_TOTAL_TOKENS_ESTIMATE})`);
-      }
-      return res.status(400).json({ 
-        error: 'Request is too large. Please shorten your message or clear conversation history.' 
-      });
+      return res.status(503).json({ error: 'AI service temporarily unavailable. Please configure OPENAI_API_KEY.' });
     }
 
     // Build messages array for OpenAI
@@ -320,11 +174,7 @@ app.post('/api/chat/message', async (req, res) => {
       { role: 'user', content: message }
     ];
 
-    if (isDevelopment) {
-      console.log(`[${requestId}] ChatGPT request: ${messageTokens} + ${historyTokens} history + ${systemTokens} system ≈ ${totalEstimatedTokens} tokens`);
-    }
-
-    // SECURITY: Call OpenAI API with cost awareness
+    // Call OpenAI API
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: messages,
@@ -334,102 +184,92 @@ app.post('/api/chat/message', async (req, res) => {
 
     const aiResponse = completion.choices[0].message.content;
 
-    if (isDevelopment) {
-      console.log(`[${requestId}] ✅ ChatGPT response: ${estimateTokens(aiResponse)} tokens`);
-    }
-
     res.json({
       response: aiResponse,
       timestamp: Date.now()
     });
 
   } catch (error) {
-    // SECURITY: Log with context but never expose internal details to production clients
-    const isOpenAIError = error.status !== undefined;
-    
     if (isDevelopment) {
-      console.error(`[${requestId}] Error:`, {
-        type: error.type || 'unknown',
-        status: error.status || 'N/A',
-        code: error.code || 'N/A',
-        message: error.message
-      });
-    } else {
-      // Production: Log just the essentials
-      console.error(`[${requestId}] [SECURITY] Chat API error:`, {
-        type: isOpenAIError ? 'openai' : 'internal',
-        status: error.status || 500
+      console.error('OpenAI API Error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        code: error.code,
+        type: error.type
       });
     }
     
-    // SECURITY: Return appropriate error response without exposing internals
     if (error.status === 401) {
-      return res.status(503).json({ 
-        error: 'AI service is not properly configured. Please try again later.' 
-      });
+      return res.status(401).json({ error: 'Invalid OpenAI API key' });
     }
     
     if (error.status === 429) {
-      return res.status(429).json({ 
-        error: 'OpenAI service is temporarily busy. Please try again in a moment.' 
-      });
+      return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
     }
 
-    if (error.status === 500) {
-      return res.status(503).json({ 
-        error: 'OpenAI service is temporarily unavailable. Please try again later.' 
-      });
-    }
-
-    // Generic error for anything else
     res.status(500).json({ 
-      error: 'Failed to generate response. Please try again or contact support.' 
+      error: 'Failed to generate response',
+      details: error.message || 'Unknown error',
+      code: error.code || 'UNKNOWN'
     });
   }
 });
 
-// ============================================================================
-// SECURITY: Global Error Handler & Logging
-// Catches any unhandled errors and prevents stack traces from leaking
-// ============================================================================
-app.use((err, req, res, next) => {
-  const requestId = Math.random().toString(36).substr(2, 9);
-  
-  if (isDevelopment) {
-    console.error(`[${requestId}] Unhandled error:`, err);
-  } else {
-    console.error(`[${requestId}] [SECURITY] Unhandled error occurred`);
-  }
-  
-  // Never expose internal error details to clients in production
-  res.status(500).json({
-    error: 'Internal server error',
-    requestId: isDevelopment ? requestId : undefined
-  });
-});
+// ================================
+// REGISTRATION & AUTH ROUTES
+// ================================
+app.use('/api/auth', authRoutes);
 
-// ============================================================================
-// SECURITY: Server Startup Checks
-// Verify that critical security settings are in place
-// ============================================================================
+// ================================
+// MONGODB CONNECTION (Optional - for Registration system)
+// ================================
+let mongoConnected = false;
+
+const connectDB = async () => {
+  try {
+    const mongoUri = process.env.MONGODB_URI;
+    
+    // Only connect if MONGODB_URI is explicitly set
+    if (!mongoUri) {
+      console.log('⚠️  MONGODB_URI not set. Registration system disabled.');
+      return false;
+    }
+    
+    if (isDevelopment) {
+      console.log(`📊 Connecting to MongoDB: ${mongoUri.replace(/:[^:]*@/, ':***@')}`);
+    }
+    
+    await mongoose.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    
+    console.log('✅ MongoDB connected successfully');
+    mongoConnected = true;
+    return true;
+  } catch (error) {
+    console.error('❌ MongoDB connection failed:', error.message);
+    console.warn('⚠️  Registration system disabled. Chat API still available.');
+    mongoConnected = false;
+    return false;
+  }
+};
+
+// Try to connect to MongoDB (non-blocking - won't crash if fails)
+await connectDB();
+
+// Export mongoConnected status to global for routes to access
+global.mongoConnected = mongoConnected;
+
+// Start server
 app.listen(PORT, () => {
   if (isDevelopment) {
-    console.log(`\n🚀 Backend server running on port ${PORT}`);
-    console.log(`✅ CORS mode: ${isDevelopment ? 'DEVELOPMENT (strict whitelist)' : 'PRODUCTION'}`);
+    console.log(`🚀 Backend server running on port ${PORT}`);
     console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
-    console.log(`✅ Rate limiting: ${RATE_LIMIT_MAX_REQUESTS} requests per ${RATE_LIMIT_WINDOW_MS / 1000}s per IP`);
-    console.log(`✅ Body size limit: 10KB`);
-    console.log(`✅ OpenAI API key: ${openaiApiKey ? 'Configured ✅' : 'Missing ❌'}`);
-    console.log(`✅ Max message length: ${MAX_MESSAGE_LENGTH} chars`);
-    console.log(`✅ Max conversation history: ${MAX_CONVERSATION_HISTORY} messages\n`);
-  } else {
-    // Production startup
-    console.log(`[STARTUP] Server running on port ${PORT}`);
-    console.log(`[SECURITY] CORS enabled for ${allowedOrigins.length} origins`);
-    console.log(`[SECURITY] Rate limiting active: ${RATE_LIMIT_MAX_REQUESTS} req/${RATE_LIMIT_WINDOW_MS / 1000}s`);
-    if (!openaiApiKey) {
-      console.error('[CRITICAL] OPENAI_API_KEY not set - AI features will fail');
-    }
+    console.log(`🤖 OpenAI API key: ${openaiApiKey ? 'Configured ✅' : 'Missing ❌'}`);
+    console.log(`📧 Email service: Configured ✅`);
+    console.log(`🔐 Auth routes: /api/auth/register, /api/auth/verify-email, /api/auth/complete-registration, /api/auth/login`);
   }
 });
 

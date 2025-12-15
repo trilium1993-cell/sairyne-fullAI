@@ -47,11 +47,3 @@ curl https://your-backend.up.railway.app/api/health
 
 Uses OpenAI GPT-4 model with specialized Ableton Live assistant prompts.
 
-## ⚖️ Legal
-
-© 2025 ТОВ «Sairyne Tech». Усі права захищено.
-
-© 2025 Sairyne Tech LLC. All rights reserved.
-
-Sairyne backend is part of Sairyne, owned and developed by ТОВ «Sairyne Tech».
-
