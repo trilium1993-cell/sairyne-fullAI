@@ -1,4 +1,12 @@
 {
-  "nodes": [],
+  "nodes": [
+    {
+      "id": "src/screens/RegisterPlugin.tsx",
+      "label": "RegisterPlugin",
+      "routes": [
+        "/register"
+      ]
+    }
+  ],
   "edges": []
 }

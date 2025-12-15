@@ -241,8 +241,13 @@ const connectDB = async () => {
     }
     
     await mongoose.connect(mongoUri, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true,
+      },
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 30000,
     });
     
     console.log('✅ MongoDB connected successfully');
@@ -263,7 +268,7 @@ await connectDB();
 global.mongoConnected = mongoConnected;
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, "127.0.0.1", () => {
   if (isDevelopment) {
     console.log(`🚀 Backend server running on port ${PORT}`);
     console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);

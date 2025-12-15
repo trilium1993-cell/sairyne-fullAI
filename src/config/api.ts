@@ -7,10 +7,12 @@
 
 /**
  * Base API URL
- * - Development: http://localhost:3001
+ * - Development: http://localhost:8000
  * - Production: Your deployed backend URL (Railway/Render)
  */
-export const API_URL = import.meta.env.VITE_API_URL || 'https://sairyne-fullai-5.onrender.com';
+// Use empty string for relative URLs (proxy will handle it)
+// Or use full URL for production
+export const API_URL = import.meta.env.VITE_API_URL || '';
 
 if (import.meta.env.DEV) {
   console.debug('[config] API_URL:', API_URL);

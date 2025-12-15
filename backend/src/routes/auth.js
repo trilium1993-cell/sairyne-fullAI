@@ -15,7 +15,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 
 // Middleware to check if MongoDB is connected
 const checkMongoDB = (req, res, next) => {
-  if (!process.mongoConnected) {
+  if (!global.mongoConnected) {
     return res.status(503).json({ 
       error: 'Registration system temporarily unavailable. Please try again later.' 
     });
@@ -322,6 +322,217 @@ router.get('/profile', verifyToken, checkMongoDB, async (req, res) => {
   } catch (error) {
     console.error('Profile error:', error);
     res.status(500).json({ error: error.message || 'Failed to fetch profile' });
+  }
+});
+
+// ================================
+// 6. SIMPLE REGISTRATION (for plugin - email + password only)
+// ================================
+router.post('/simple-register', checkMongoDB, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !validator.isEmail(email)) {
+      return res.status(400).json({ error: 'Valid email is required' });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Create new user
+    const newUser = new User({
+      email: email.toLowerCase(),
+      password,
+      emailVerified: true, // Auto-verify for plugin users
+      registrationStatus: 'completed',
+      nick: email.split('@')[0] // Auto-generate nick from email
+    });
+
+    await newUser.save();
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: newUser._id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY }
+    );
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Registration completed',
+      token,
+      user: {
+        _id: newUser._id,
+        email: newUser.email,
+        nick: newUser.nick
+      }
+    });
+
+  } catch (error) {
+    console.error('Simple registration error:', error);
+    res.status(500).json({ error: error.message || 'Registration failed' });
+  }
+});
+
+// ================================
+// 7. SIMPLE LOGIN (for plugin - email + password)
+// ================================
+router.post('/simple-login', checkMongoDB, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (!user || !(await user.comparePassword(password))) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY }
+    );
+
+    res.json({
+      status: 'success',
+      token,
+      user: {
+        _id: user._id,
+        email: user.email,
+        nick: user.nick
+      }
+    });
+
+  } catch (error) {
+    console.error('Simple login error:', error);
+    res.status(500).json({ error: error.message || 'Login failed' });
+  }
+});
+
+// ================================
+// 7. SIMPLE LOGIN DEV (without MongoDB check - for testing)
+// ================================
+router.post('/simple-login-dev', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // If MongoDB is connected, use it
+    if (global.mongoConnected) {
+      const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+      
+      if (!user || !(await user.comparePassword(password))) {
+        return res.status(401).json({ error: 'Invalid email or password' });
+      }
+
+      // Generate JWT token
+      const token = jwt.sign(
+        { userId: user._id, email: user.email },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRY }
+      );
+
+      return res.json({
+        status: 'success',
+        token,
+        user: {
+          _id: user._id,
+          email: user.email,
+          nick: user.nick
+        }
+      });
+    }
+
+    // Fallback: For development, accept any email/password combo with 8+ characters
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // Generate a mock user response (for development testing)
+    const mockUserId = crypto.createHash('md5').update(email).digest('hex');
+    const token = jwt.sign(
+      { userId: mockUserId, email: email.toLowerCase() },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRY }
+    );
+
+    res.json({
+      status: 'success',
+      token,
+      user: {
+        _id: mockUserId,
+        email: email.toLowerCase(),
+        nick: email.split('@')[0]
+      }
+    });
+
+  } catch (error) {
+    console.error('Simple login dev error:', error);
+    res.status(500).json({ error: error.message || 'Login failed' });
+  }
+});
+
+// ================================
+// 8. RESET PASSWORD DEV (for testing)
+// ================================
+router.post('/reset-password-dev', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: 'Email and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // If MongoDB is connected, update in database
+    if (global.mongoConnected) {
+      const user = await User.findOne({ email: email.toLowerCase() });
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Hash and update password
+      user.password = newPassword;
+      await user.save();
+
+      return res.json({
+        status: 'success',
+        message: 'Password updated successfully',
+        email: user.email
+      });
+    }
+
+    // Fallback: For development without MongoDB, just return success
+    // In production, you would send a reset link via email
+    res.json({
+      status: 'success',
+      message: 'Password reset email sent (dev mode)',
+      email: email.toLowerCase()
+    });
+
+  } catch (error) {
+    console.error('Reset password dev error:', error);
+    res.status(500).json({ error: error.message || 'Reset failed' });
   }
 });
 

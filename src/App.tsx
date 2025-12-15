@@ -1,6 +1,8 @@
 import { useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import ScreenManager from "./components/ScreenManager";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { RegisterPlugin } from "./screens/RegisterPlugin";
 import { applyEmbedFlagToBody } from "./utils/embed";
 import "../tailwind.css";
 import { MasterChannelNotice } from "./components/MasterChannelNotice";
@@ -89,15 +91,24 @@ function App() {
   }, []);
 
   return (
-    <ErrorBoundary componentName="App">
-      <div style={{
-        minHeight: '100vh',
-        backgroundColor: '#0b0a0f'
-      }}>
-        <MasterChannelNotice />
-        <ScreenManager />
-      </div>
-    </ErrorBoundary>
+    <Router>
+      <ErrorBoundary componentName="App">
+        <div style={{
+          minHeight: '100vh',
+          backgroundColor: '#0b0a0f'
+        }}>
+          <Routes>
+            <Route path="/register" element={<RegisterPlugin />} />
+            <Route path="*" element={
+              <>
+                <MasterChannelNotice />
+                <ScreenManager />
+              </>
+            } />
+          </Routes>
+        </div>
+      </ErrorBoundary>
+    </Router>
   );
 }
 

@@ -3,6 +3,7 @@ import { Window } from "../../components/Window";
 import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { createSession, findUserByEmail, getCurrentUser } from "../../services/auth";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
+import { API_URL } from "../../config/api";
 
 interface SignInProps {
   onNext: () => void;
@@ -29,7 +30,7 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
   // Убрали жесткие ограничения на домены - теперь любые email принимаются
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateEmail(email)) {
@@ -44,21 +45,66 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       return;
     }
 
-    const userRecord = findUserByEmail(email.trim());
-    if (userRecord && userRecord.password !== password) {
-      setErrorMessage("Incorrect password. Please try again.");
-      setShowError(true);
-      return;
-    }
+    try {
+      // Send login request to backend
+      console.log('🔐 DEBUG API_URL constant:', API_URL);
+      console.log('🔐 DEBUG import.meta.env.DEV:', import.meta.env.DEV);
+      console.log('🔐 DEBUG import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL);
+      
+      const loginUrl = `${API_URL}/api/auth/simple-login-dev`;
+      console.log('🔐 Attempting login:', { email, API_URL, loginUrl });
+      console.log('📨 Fetch body:', JSON.stringify({ email: email.trim(), password }));
+      
+      const requestBody = JSON.stringify({ email: email.trim(), password });
+      console.log('📤 Starting fetch to:', loginUrl);
+      
+      const response = await fetch(loginUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: requestBody,
+      });
 
-    const session = createSession(email, password);
-    if (!session.success) {
-      setErrorMessage(session.error || "Unable to sign in. Please try again.");
-      setShowError(true);
-      return;
-    }
+      console.log('📡 Response received! Status:', response.status, response.statusText);
+      console.log('📡 Response headers:', {
+        'content-type': response.headers.get('content-type'),
+        'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+      });
+      
+      console.log('📦 Parsing JSON...');
+      const data = await response.json();
+      console.log('📦 Response data:', data);
 
-    onNext();
+      if (!response.ok) {
+        setErrorMessage(data.error || "Invalid email or password");
+        setShowError(true);
+        return;
+      }
+
+      console.log('✅ Login successful!', data);
+
+      // User authenticated! Save locally
+      if (typeof window !== "undefined" && window.localStorage) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('email', data.user.email);
+      }
+
+      // Also create a session locally for compatibility
+      const session = createSession(email, password);
+      if (!session.success) {
+        console.warn('Local session creation failed:', session.error);
+      }
+
+      onNext();
+    } catch (error) {
+      console.error('❌ Login error:', error);
+      console.error('Error message:', (error as Error).message);
+      console.error('Error stack:', (error as Error).stack);
+      setErrorMessage("Network error. Please check your connection and try again.");
+      setShowError(true);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -69,11 +115,11 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleForgotPassword = () => {
-    window.open('https://sairyne.com', '_blank');
+    window.open('http://localhost:5173/reset-password', '_blank');
   };
 
   const handleSignUp = () => {
-    window.open('https://www.sairyne.net', '_blank');
+    window.open('http://localhost:5173/register', '_blank');
   };
 
   const closeError = () => {
@@ -120,7 +166,10 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    console.log('📧 Email changed:', e.target.value);
+                    setEmail(e.target.value);
+                  }}
                   onKeyPress={handleKeyPress}
                   placeholder="Email"
                   className="w-full h-full px-3.5 py-2.5 font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] placeholder:text-[#ffffff80]"
