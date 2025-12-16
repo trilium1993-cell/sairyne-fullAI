@@ -9,12 +9,16 @@
     "build": "vite build"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "clsx": "2.1.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongodb": "^7.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.1",
     "tailwind-merge": "2.5.4",
-    "tailwindcss-animate": "1.0.7"
+    "tailwindcss-animate": "1.0.7",
+    "validator": "^13.15.23"
   },
   "devDependencies": {
     "@animaapp/vite-plugin-screen-graph": "^0.1.5",
