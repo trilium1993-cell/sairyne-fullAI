@@ -377,8 +377,9 @@ await connectDB();
 global.mongoConnected = mongoConnected;
 
 // Start server
-// IMPORTANT: On Render (and most PaaS) we must bind to 0.0.0.0 so the platform can detect the open port.
-app.listen(PORT, "0.0.0.0", () => {
+// IMPORTANT: On Render (and most PaaS) do NOT bind to 127.0.0.1.
+// Omitting the host makes Node bind to 0.0.0.0 by default, which Render can detect reliably.
+app.listen(PORT, () => {
   if (isDevelopment) {
     console.log(`🚀 Backend server running on port ${PORT}`);
     console.log(`✅ Allowed origins: ${allowedOrigins.join(', ')}`);
