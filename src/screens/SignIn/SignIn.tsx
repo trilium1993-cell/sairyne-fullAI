@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Window } from "../../components/Window";
 import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { getCurrentUser } from "../../services/auth";
+import { openUrlInSystemBrowser } from "../../services/audio/juceBridge";
+import { resolveIsEmbedded } from "../../utils/embed";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
 import { API_URL } from "../../config/api";
 
@@ -180,11 +182,23 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleForgotPassword = () => {
-    window.open('http://localhost:5173/reset-password', '_blank');
+    const url = 'https://www.sairyne.net/reset-password';
+    const isEmbedded = resolveIsEmbedded();
+    if (isEmbedded) {
+      openUrlInSystemBrowser(url);
+    } else if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
   };
 
   const handleSignUp = () => {
-    window.open('http://localhost:5173/register', '_blank');
+    const url = 'https://www.sairyne.net/register';
+    const isEmbedded = resolveIsEmbedded();
+    if (isEmbedded) {
+      openUrlInSystemBrowser(url);
+    } else if (typeof window !== 'undefined') {
+      window.open(url, '_blank');
+    }
   };
 
   const closeError = () => {
