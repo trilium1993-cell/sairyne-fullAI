@@ -5,8 +5,12 @@
   "framework": "vite",
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://sairyne-fullai-5.onrender.com/api/$1"
+      "source": "/api/chat/(.*)",
+      "destination": "https://sairyne-fullai-5.onrender.com/api/chat/$1"
+    },
+    {
+      "source": "/api/health",
+      "destination": "https://sairyne-fullai-5.onrender.com/api/health"
     },
     {
       "source": "/(.*)",
