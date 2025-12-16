@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import mongoose from 'mongoose';
+import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
 import emailService from './services/emailService.js';
 import { getSystemPrompt } from './prompts/sairyneSystemPrompts.js';
@@ -91,6 +92,49 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 app.use(express.json());
 
+// ================================
+// RATE LIMITING MIDDLEWARE
+// ================================
+// Rate limiter for login attempts (protect from brute force)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per IP
+  message: 'Too many login attempts. Please try again after 15 minutes.',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  skip: (req) => {
+    // Don't rate limit from localhost (for development)
+    return req.ip === '127.0.0.1' || req.ip === 'localhost' || req.ip === '::1';
+  }
+});
+
+// Rate limiter for registration (prevent spam accounts)
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 registrations per IP per hour
+  message: 'Too many accounts created from this IP. Please try again later.',
+  skip: (req) => {
+    return req.ip === '127.0.0.1' || req.ip === 'localhost' || req.ip === '::1';
+  }
+});
+
+// Rate limiter for AI chat (generous limit, mostly for DDoS protection)
+const chatLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 messages per minute (very generous for normal users)
+  message: 'Too many chat requests. Please wait a moment.',
+  skip: (req) => {
+    return req.ip === '127.0.0.1' || req.ip === 'localhost' || req.ip === '::1';
+  }
+});
+
+if (isDevelopment) {
+  console.log('🛡️ Rate limiting configured:');
+  console.log('  - Login: 5 attempts per 15 minutes');
+  console.log('  - Register: 10 accounts per hour');
+  console.log('  - Chat: 60 messages per minute');
+}
+
 // Lightweight test endpoint
 app.get('/api/test', (req, res) => {
   res.json({ status: 'ok', origin: req.headers.origin || 'none' });
@@ -153,7 +197,7 @@ app.post('/analytics/event', (req, res) => {
 });
 
 // Chat endpoint
-app.post('/api/chat/message', async (req, res) => {
+app.post('/api/chat/message', chatLimiter, async (req, res) => {
   try {
     const { message, conversationHistory = [], mode = 'create' } = req.body;
 
@@ -223,7 +267,7 @@ app.post('/api/chat/message', async (req, res) => {
 // ================================
 // ANALYZE LEARN MODE CONTEXT & CONTINUE WITH AI
 // ================================
-app.post('/api/chat/analyze-learn-context', async (req, res) => {
+app.post('/api/chat/analyze-learn-context', chatLimiter, async (req, res) => {
   try {
     const { learnContext = [] } = req.body;
 

@@ -52,6 +52,9 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
   const handleOpenEULA = () => {
     console.log('[UserMenu] EULA clicked');
     setShowEULA(true);
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleOpenWebsite = () => {

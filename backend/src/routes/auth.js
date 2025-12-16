@@ -3,11 +3,35 @@ import jwt from 'jsonwebtoken';
 import validator from 'validator';
 import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import rateLimit from 'express-rate-limit';
 import User from '../models/User.js';
 import emailService from '../services/emailService.js';
 import { verifyToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// ================================
+// RATE LIMITING FOR AUTH ROUTES
+// ================================
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per IP
+  message: 'Too many login attempts. Please try again after 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    return req.ip === '127.0.0.1' || req.ip === 'localhost' || req.ip === '::1';
+  }
+});
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // 10 registrations per IP per hour
+  message: 'Too many accounts created from this IP. Please try again later.',
+  skip: (req) => {
+    return req.ip === '127.0.0.1' || req.ip === 'localhost' || req.ip === '::1';
+  }
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
 const JWT_EXPIRY = '7d';
@@ -36,7 +60,7 @@ const generateApiKey = () => {
 // ================================
 // 1. INITIAL REGISTRATION (email, DAW, OS)
 // ================================
-router.post('/register', checkMongoDB, async (req, res) => {
+router.post('/register', registerLimiter, checkMongoDB, async (req, res) => {
   try {
     const { email, daw, operatingSystem } = req.body;
 
@@ -328,7 +352,7 @@ router.get('/profile', verifyToken, checkMongoDB, async (req, res) => {
 // ================================
 // 6. SIMPLE REGISTRATION (for plugin - email + password only)
 // ================================
-router.post('/simple-register', checkMongoDB, async (req, res) => {
+router.post('/simple-register', registerLimiter, checkMongoDB, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -385,7 +409,7 @@ router.post('/simple-register', checkMongoDB, async (req, res) => {
 // ================================
 // 7. SIMPLE LOGIN (for plugin - email + password)
 // ================================
-router.post('/simple-login', checkMongoDB, async (req, res) => {
+router.post('/simple-login', loginLimiter, checkMongoDB, async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -425,7 +449,7 @@ router.post('/simple-login', checkMongoDB, async (req, res) => {
 // ================================
 // 7. SIMPLE LOGIN DEV (without MongoDB check - for testing)
 // ================================
-router.post('/simple-login-dev', async (req, res) => {
+router.post('/simple-login-dev', loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
 

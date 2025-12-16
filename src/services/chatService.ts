@@ -10,6 +10,59 @@ interface ChatResponse {
   timestamp: number;
 }
 
+/**
+ * Fetch with timeout wrapper
+ * Prevents hanging requests by aborting after timeoutMs
+ */
+function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  return fetch(url, {
+    ...options,
+    signal: controller.signal
+  }).finally(() => clearTimeout(timeoutId));
+}
+
+/**
+ * Retry with exponential backoff
+ * Automatically retry failed requests with increasing delays
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  initialDelayMs = 1000
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxRetries) {
+        // Last attempt failed
+        break;
+      }
+
+      // Calculate delay: 1s, 2s, 4s, 8s...
+      const delayMs = initialDelayMs * Math.pow(2, attempt);
+      
+      if (import.meta.env.DEV) {
+        console.log(
+          `⚠️ Attempt ${attempt + 1} failed. Retrying in ${delayMs}ms...`,
+          lastError?.message
+        );
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
 export class ChatService {
   /**
    * Send message to AI backend
@@ -21,49 +74,52 @@ export class ChatService {
     conversationHistory: ChatMessage[] = [],
     mode: 'learn' | 'create' | 'pro' = 'create'
   ): Promise<string> {
-    try {
-      const isDev = import.meta.env.DEV;
-      // Use Render backend for all AI (Pro Mode + Learn Mode)
-      const url = 'https://sairyne-fullai-5.onrender.com/api/chat/message';
-      if (isDev) {
-        console.debug('[chat] POST', url, 'mode:', mode);
-      }
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          conversationHistory: conversationHistory.slice(-10), // Last 10 messages for context
-          mode // Pass the mode to backend for proper prompt selection
-        }),
-      });
-
-      if (isDev) {
-        console.debug('[chat] status', response.status);
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (isDev) {
-          console.error('[chat] error response', errorData);
-        }
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const data: ChatResponse = await response.json();
-      if (isDev) {
-        console.debug('[chat] success', data);
-      }
-      return data.response;
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('[chat] request failed', error);
-      }
-      throw error;
+    const isDev = import.meta.env.DEV;
+    const url = 'https://sairyne-fullai-5.onrender.com/api/chat/message';
+    
+    if (isDev) {
+      console.debug('[chat] POST', url, 'mode:', mode);
     }
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message,
+              conversationHistory: conversationHistory.slice(-10), // Last 10 messages for context
+              mode // Pass the mode to backend for proper prompt selection
+            }),
+          },
+          30000 // 30 second timeout
+        );
+
+        if (isDev) {
+          console.debug('[chat] status', response.status);
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (isDev) {
+            console.error('[chat] error response', errorData);
+          }
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const data: ChatResponse = await response.json();
+        if (isDev) {
+          console.debug('[chat] success', data);
+        }
+        return data.response;
+      },
+      3, // Max 3 retries
+      1000 // 1 second initial delay
+    );
   }
 
   /**
@@ -71,48 +127,50 @@ export class ChatService {
    * Uses Render backend for AI processing (has OPENAI_API_KEY)
    */
   static async analyzeLearnModeContext(learnContext: ChatMessage[]): Promise<string> {
-    try {
-      const isDev = import.meta.env.DEV;
-      // Use Render backend for Learn Mode AI (it has the OPENAI_API_KEY)
-      const url = 'https://sairyne-fullai-5.onrender.com/api/chat/analyze-learn-context';
-      
-      if (isDev) {
-        console.debug('[chat] POST analyze-learn-context', url);
-      }
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          learnContext
-        }),
-      });
-
-      if (isDev) {
-        console.debug('[chat] status', response.status);
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (isDev) {
-          console.error('[chat] error response', errorData);
-        }
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
-
-      const data: ChatResponse = await response.json();
-      if (isDev) {
-        console.debug('[chat] analyze-learn-context success', data);
-      }
-      return data.response;
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('[chat] analyze-learn-context failed', error);
-      }
-      throw error;
+    const isDev = import.meta.env.DEV;
+    const url = 'https://sairyne-fullai-5.onrender.com/api/chat/analyze-learn-context';
+    
+    if (isDev) {
+      console.debug('[chat] POST analyze-learn-context', url);
     }
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              learnContext
+            }),
+          },
+          30000 // 30 second timeout
+        );
+
+        if (isDev) {
+          console.debug('[chat] status', response.status);
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          if (isDev) {
+            console.error('[chat] error response', errorData);
+          }
+          throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+
+        const data: ChatResponse = await response.json();
+        if (isDev) {
+          console.debug('[chat] analyze-learn-context success', data);
+        }
+        return data.response;
+      },
+      3, // Max 3 retries
+      1000 // 1 second initial delay
+    );
   }
 
   /**
