@@ -341,7 +341,11 @@ const connectDB = async () => {
     
     // Only connect if MONGODB_URI is explicitly set
     if (!mongoUri) {
-      console.log('⚠️  MONGODB_URI not set. Registration system disabled.');
+      // In production (Render) we intentionally keep auth/registration on Vercel.
+      // Avoid noisy logs that look like an error when MongoDB is not configured here.
+      if (isDevelopment) {
+        console.log('⚠️  MONGODB_URI not set. Registration system disabled (expected in prod if auth runs on Vercel).');
+      }
       return false;
     }
     
