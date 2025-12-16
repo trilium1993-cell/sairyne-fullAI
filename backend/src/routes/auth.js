@@ -560,5 +560,48 @@ router.post('/reset-password-dev', async (req, res) => {
   }
 });
 
+// ================================
+// 9. ADMIN STATS (для подсчета пользователей)
+// ================================
+router.get('/stats', async (req, res) => {
+  try {
+    if (!global.mongoConnected) {
+      return res.status(503).json({ 
+        error: 'Database temporarily unavailable',
+        stats: null
+      });
+    }
+
+    const totalUsers = await User.countDocuments();
+    const verifiedUsers = await User.countDocuments({ emailVerified: true });
+    const pendingUsers = await User.countDocuments({ emailVerified: false });
+
+    // Get latest users (last 5)
+    const latestUsers = await User.find()
+      .select('email createdAt registrationStatus')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    res.json({
+      status: 'success',
+      stats: {
+        totalUsers,
+        verifiedUsers,
+        pendingUsers,
+        latestUsers: latestUsers.map(u => ({
+          email: u.email,
+          createdAt: u.createdAt,
+          status: u.registrationStatus
+        }))
+      },
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    console.error('Stats error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get stats' });
+  }
+});
+
 export default router;
 
