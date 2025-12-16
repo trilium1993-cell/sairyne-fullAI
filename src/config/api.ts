@@ -13,10 +13,6 @@
 const RENDER_API_BASE = 'https://sairyne-fullai-5.onrender.com';
 
 function inferApiBase(): string {
-  const fromEnv = import.meta.env.VITE_API_URL;
-  if (fromEnv) return fromEnv;
-
-  // In JUCE WebViews the app is often loaded from file://, so relative /api/... breaks.
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location;
 
@@ -39,6 +35,9 @@ function inferApiBase(): string {
     // Default production fallback
     return RENDER_API_BASE;
   }
+
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (fromEnv) return fromEnv;
 
   // SSR/unknown: keep relative
   return '';
