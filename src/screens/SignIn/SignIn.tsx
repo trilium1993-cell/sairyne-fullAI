@@ -144,10 +144,23 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
       onNext();
     } catch (error) {
-      console.error('❌ Login error:', error);
-      console.error('Error message:', (error as Error).message);
-      console.error('Error stack:', (error as Error).stack);
-      setErrorMessage("Network error. Please check your connection and try again.");
+      const err = error as any;
+      console.error('❌ Login error:', err);
+      console.error('Error message:', err?.message);
+      console.error('Error stack:', err?.stack);
+
+      const locationInfo =
+        typeof window !== 'undefined'
+          ? { href: window.location.href, protocol: window.location.protocol, host: window.location.host }
+          : { href: 'n/a', protocol: 'n/a', host: 'n/a' };
+
+      // Show the real underlying reason (WebView fetch often fails with a useful message)
+      const details = err?.message ? `\n\nDetails: ${String(err.message)}` : '';
+      setErrorMessage(
+        `Network error. Please check your connection and try again.${details}\n\n` +
+          `Loaded from: ${locationInfo.href}\n` +
+          `API_URL: ${API_URL || '(empty)'}`
+      );
       setShowError(true);
     }
   };
@@ -286,7 +299,7 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
                 <h3 className="font-h1 font-[number:var(--h1-font-weight)] text-[#f7efff] text-[length:var(--h1-font-size)] text-center tracking-[var(--h1-letter-spacing)] leading-[var(--h1-line-height)] [font-style:var(--h1-font-style)] mb-4">
                   Error
                 </h3>
-                <p className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] mb-6">
+                <p className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] mb-6 whitespace-pre-line break-words select-text max-h-[90px] overflow-y-auto">
                   {errorMessage}
                 </p>
                 <button
