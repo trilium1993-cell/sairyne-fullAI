@@ -39,8 +39,8 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters");
+    if (password.length < 8) {
+      setErrorMessage("Password must be at least 8 characters");
       setShowError(true);
       return;
     }
@@ -51,25 +51,73 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       console.log('🔐 DEBUG import.meta.env.DEV:', import.meta.env.DEV);
       console.log('🔐 DEBUG import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL);
       
-      // Use real Mongo-backed login when targeting hosted backend; keep -dev endpoint for local development.
-      const isHosted = typeof API_URL === 'string' && API_URL.includes('onrender.com');
-      const loginPath = isHosted ? '/api/auth/simple-login' : '/api/auth/simple-login-dev';
-      const loginUrl = `${API_URL}${loginPath}`;
-      console.log('🔐 Attempting login:', { email, API_URL, loginUrl, isHosted });
-      console.log('📨 Fetch body:', JSON.stringify({ email: email.trim(), password }));
-      
       const requestBody = JSON.stringify({ email: email.trim(), password });
-      console.log('📤 Starting fetch to:', loginUrl);
-      
-      const response = await fetch(loginUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: requestBody,
-      });
+      console.log('📨 Fetch body:', requestBody);
 
-      console.log('📡 Response received! Status:', response.status, response.statusText);
+      const locationInfo =
+        typeof window !== 'undefined'
+          ? { href: window.location.href, protocol: window.location.protocol, host: window.location.host }
+          : { href: 'n/a', protocol: 'n/a', host: 'n/a' };
+
+      // WebViews can behave differently depending on whether we are loaded from file:// or http://.
+      // To maximize robustness inside Ableton/Logic, try a small set of known-good bases.
+      const candidateBases = Array.from(
+        new Set(
+          [
+            API_URL,
+            'http://127.0.0.1:8000',
+            'http://localhost:8000',
+            'https://sairyne-fullai-5.onrender.com',
+          ].filter(Boolean)
+        )
+      );
+
+      const tryLoginOnce = async (base: string, path: string) => {
+        const url = `${base}${path}`;
+        console.log('📤 Starting fetch to:', url, { base, path, locationInfo });
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+        });
+        return { resp, url };
+      };
+
+      let response: Response | null = null;
+      let usedUrl = '';
+
+      // Prefer real Mongo-backed endpoint first, then dev endpoint as fallback.
+      const pathsToTry = ['/api/auth/simple-login', '/api/auth/simple-login-dev'];
+
+      let lastError: any = null;
+      for (const base of candidateBases) {
+        for (const path of pathsToTry) {
+          try {
+            const { resp, url } = await tryLoginOnce(base, path);
+            usedUrl = url;
+            response = resp;
+            // If we got an HTTP response (even 401), stop iterating bases/paths.
+            break;
+          } catch (err) {
+            lastError = err;
+            console.error('❌ Fetch failed:', { base, path, err });
+          }
+        }
+        if (response) break;
+      }
+
+      if (!response) {
+        const details = lastError?.message ? ` (${lastError.message})` : '';
+        setErrorMessage(
+          `Network error inside plugin. Unable to reach login server.${details}\n\n` +
+            `Loaded from: ${locationInfo.href}\n` +
+            `Tried bases: ${candidateBases.join(', ')}`
+        );
+        setShowError(true);
+        return;
+      }
+
+      console.log('📡 Response received! Status:', response.status, response.statusText, 'URL:', usedUrl);
       console.log('📡 Response headers:', {
         'content-type': response.headers.get('content-type'),
         'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
