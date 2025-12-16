@@ -51,8 +51,11 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       console.log('🔐 DEBUG import.meta.env.DEV:', import.meta.env.DEV);
       console.log('🔐 DEBUG import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL);
       
-      const loginUrl = `${API_URL}/api/auth/simple-login-dev`;
-      console.log('🔐 Attempting login:', { email, API_URL, loginUrl });
+      // Use real Mongo-backed login when targeting hosted backend; keep -dev endpoint for local development.
+      const isHosted = typeof API_URL === 'string' && API_URL.includes('onrender.com');
+      const loginPath = isHosted ? '/api/auth/simple-login' : '/api/auth/simple-login-dev';
+      const loginUrl = `${API_URL}${loginPath}`;
+      console.log('🔐 Attempting login:', { email, API_URL, loginUrl, isHosted });
       console.log('📨 Fetch body:', JSON.stringify({ email: email.trim(), password }));
       
       const requestBody = JSON.stringify({ email: email.trim(), password });

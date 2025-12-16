@@ -10,9 +10,35 @@
  * - Development: http://localhost:8000
  * - Production: Your deployed backend URL (Railway/Render)
  */
-// Use empty string for relative URLs (proxy will handle it)
-// Or use full URL for production
-export const API_URL = import.meta.env.VITE_API_URL || '';
+const RENDER_API_BASE = 'https://sairyne-fullai-5.onrender.com';
+
+function inferApiBase(): string {
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (fromEnv) return fromEnv;
+
+  // In JUCE WebViews the app is often loaded from file://, so relative /api/... breaks.
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+
+    // If opened from disk inside the plugin, prefer the hosted backend.
+    if (protocol === 'file:') {
+      return RENDER_API_BASE;
+    }
+
+    // If running locally (dev/proxy), prefer local backend explicitly.
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://127.0.0.1:8000';
+    }
+
+    // Default production fallback
+    return RENDER_API_BASE;
+  }
+
+  // SSR/unknown: keep relative
+  return '';
+}
+
+export const API_URL = inferApiBase();
 
 if (import.meta.env.DEV) {
   console.debug('[config] API_URL:', API_URL);
