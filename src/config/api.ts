@@ -20,6 +20,12 @@ function inferApiBase(): string {
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location;
 
+    // If we are hosted on Vercel, prefer same-origin `/api/...` and let Vercel rewrite/proxy to Render.
+    // This avoids cross-domain fetch restrictions in some WKWebView setups.
+    if (hostname.endsWith('vercel.app') || hostname === 'sairyne-ai.vercel.app') {
+      return '';
+    }
+
     // If opened from disk inside the plugin, prefer the hosted backend.
     if (protocol === 'file:') {
       return RENDER_API_BASE;

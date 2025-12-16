@@ -1,4 +1,4 @@
-import { API_URL, API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, getApiUrl } from '../config/api';
 
 interface ChatMessage {
   type: 'user' | 'ai';
@@ -75,7 +75,7 @@ export class ChatService {
     mode: 'learn' | 'create' | 'pro' = 'create'
   ): Promise<string> {
     const isDev = import.meta.env.DEV;
-    const url = 'https://sairyne-fullai-5.onrender.com/api/chat/message';
+    const url = getApiUrl(API_ENDPOINTS.CHAT_MESSAGE);
     
     if (isDev) {
       console.debug('[chat] POST', url, 'mode:', mode);
@@ -128,7 +128,7 @@ export class ChatService {
    */
   static async analyzeLearnModeContext(learnContext: ChatMessage[]): Promise<string> {
     const isDev = import.meta.env.DEV;
-    const url = 'https://sairyne-fullai-5.onrender.com/api/chat/analyze-learn-context';
+    const url = getApiUrl('/api/chat/analyze-learn-context');
     
     if (isDev) {
       console.debug('[chat] POST analyze-learn-context', url);
@@ -178,7 +178,7 @@ export class ChatService {
    */
   static async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetch(`${API_URL}${API_ENDPOINTS.HEALTH}`);
+      const response = await fetch(getApiUrl(API_ENDPOINTS.HEALTH));
       return response.ok;
     } catch (error) {
       console.error('Backend health check failed:', error);

@@ -61,19 +61,26 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
       // WebViews can behave differently depending on whether we are loaded from file:// or http://.
       // To maximize robustness inside Ableton/Logic, try a small set of known-good bases.
+      const rawBases = [
+        API_URL, // can be '' on Vercel to force same-origin /api proxy
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'https://sairyne-fullai-5.onrender.com',
+      ];
+
+      // Avoid mixed-content attempts when loaded from https (WKWebView can throw cryptic errors).
       const candidateBases = Array.from(
         new Set(
-          [
-            API_URL,
-            'http://127.0.0.1:8000',
-            'http://localhost:8000',
-            'https://sairyne-fullai-5.onrender.com',
-          ].filter(Boolean)
+          rawBases.filter((b) => {
+            if (b === '' || b == null) return true;
+            if (locationInfo.protocol === 'https:' && b.startsWith('http://')) return false;
+            return true;
+          })
         )
       );
 
       const tryLoginOnce = async (base: string, path: string) => {
-        const url = `${base}${path}`;
+        const url = base ? `${base}${path}` : path; // base '' => same-origin /api/...
         console.log('📤 Starting fetch to:', url, { base, path, locationInfo });
         const resp = await fetch(url, {
           method: 'POST',
