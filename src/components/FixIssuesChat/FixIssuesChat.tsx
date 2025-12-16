@@ -1,9 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatMessage } from "../ChatMessage";
 import { ChatButton } from "../ChatButton";
-import { useTypingAnimation } from "../../hooks/useTypingAnimation";
-import arrowsIcon from '../../assets/img/arrows-in-simple-light-1.svg';
-import closeIcon from '../../assets/img/vector.svg';
 
 interface FixIssuesChatProps {
   onClose: () => void;
@@ -19,7 +16,7 @@ interface Message {
   isTyping?: boolean;
 }
 
-export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingMessages, onMessagesUpdate }) => {
+export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ existingMessages, onMessagesUpdate }) => {
   const [messages, setMessages] = useState<Message[]>(existingMessages);
   const [showOptions, setShowOptions] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -67,19 +64,23 @@ export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingM
     };
 
     setMessages(prev => [...prev, message]);
-    scrollToBottom();
+    scrollToNewMessage();
 
-    let index = 0;
-    const typeNextChar = () => {
-      if (index < content.length) {
-        const currentText = content.substring(0, index + 1);
+    // Split content into words and animate word-by-word with fade-in
+    const words = content.split(' ');
+    let wordIndex = 0;
+    
+    const typeNextWord = () => {
+      if (wordIndex < words.length) {
+        const currentText = words.slice(0, wordIndex + 1).join(' ');
         setMessages(prev => prev.map(msg => 
           msg.id === message.id 
             ? { ...msg, content: currentText }
             : msg
         ));
-        index++;
-        setTimeout(typeNextChar, 30);
+        wordIndex++;
+        // 18ms per word - same as FunctionalChat
+        setTimeout(typeNextWord, 18);
       } else {
         setMessages(prev => prev.map(msg => 
           msg.id === message.id 
@@ -87,26 +88,27 @@ export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingM
             : msg
         ));
         if (onComplete) {
-          setTimeout(onComplete, 300);
+          setTimeout(onComplete, 50);
         }
       }
     };
     
-    setTimeout(typeNextChar, 500);
+    setTimeout(typeNextWord, 50);
   };
 
-  // Автоскролл
-  const scrollToBottom = () => {
+  // Scroll to show new message once, then let user scroll manually (like ChatGPT)
+  const scrollToNewMessage = () => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      // Wait for DOM to update before scrolling (50ms delay)
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          const container = chatContainerRef.current;
+          const targetScroll = container.scrollHeight - container.clientHeight;
+          container.scrollTop = targetScroll; // Instant scroll, one time only
+        }
+      }, 50);
     }
   };
-
-  // Автоскролл при изменении сообщений
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
 
   // Обработка кнопок в чате
   const handleChatButton = (buttonText: string) => {
@@ -118,6 +120,7 @@ export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingM
     };
     
     setMessages(prev => [...prev, newMessage]);
+    scrollToNewMessage();
     
     // AI ответ
     setTimeout(() => {
@@ -129,8 +132,7 @@ export const FixIssuesChat: React.FC<FixIssuesChatProps> = ({ onClose, existingM
         isTyping: true
       };
       setMessages(prev => [...prev, aiResponse]);
-      
-      typeMessage(aiResponse, () => {});
+      setTimeout(() => scrollToNewMessage(), 50);
     }, 1000);
   };
 

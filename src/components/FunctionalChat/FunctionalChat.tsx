@@ -181,6 +181,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [completedStepText, setCompletedStepText] = useState("");
   const [showLearnMode, setShowLearnMode] = useState(false);
   const [selectedLearnLevel, setSelectedLearnLevel] = useState("learn");
+  const [learnModeAIActive, setLearnModeAIActive] = useState(false); // Флаг для AI диалога в Learn mode
   const [showVisualTips, setShowVisualTips] = useState(false);
   const [showProjectAnalysis, setShowProjectAnalysis] = useState(false);
   const [showAnalysingChannels, setShowAnalysingChannels] = useState(false);
@@ -342,10 +343,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Создаем шаги чата с актуальным названием проекта
   const chatSteps = createChatSteps(projectName);
 
-  // Автоскролл к низу чата
-  const scrollToBottom = () => {
+  // Автоскролл к низу чата с плавной анимацией
+  // Scroll to show new AI message once, then let user scroll manually (like ChatGPT)
+  const scrollToNewMessage = () => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      // Scroll to show the new AI message that just appeared
+      // Wait for DOM to update before scrolling (50ms delay)
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          const container = chatContainerRef.current;
+          const targetScroll = container.scrollHeight - container.clientHeight;
+          container.scrollTop = targetScroll; // Instant scroll, one time only
+        }
+      }, 50);
     }
   };
 
@@ -361,22 +371,24 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
 
     setMessages(prev => [...prev, message]);
-    // Не делаем автоскролл во время переключения Visual Tips
-    if (true) {
-      scrollToBottom();
-    }
+    // Scroll to the new message once when it appears
+    scrollToNewMessage();
 
-    let index = 0;
-    const typeNextChar = () => {
-      if (index < content.length) {
-        const currentText = content.substring(0, index + 1);
+    // Split content into words and animate word-by-word with fade-in
+    const words = content.split(' ');
+    let wordIndex = 0;
+    
+    const typeNextWord = () => {
+      if (wordIndex < words.length) {
+        const currentText = words.slice(0, wordIndex + 1).join(' ');
         setMessages(prev => prev.map(msg => 
           msg.id === message.id 
             ? { ...msg, content: currentText }
             : msg
         ));
-        index++;
-        setTimeout(typeNextChar, 30);
+        wordIndex++;
+        // 18ms per word
+        setTimeout(typeNextWord, 18);
       } else {
         setMessages(prev => prev.map(msg => 
           msg.id === message.id 
@@ -384,12 +396,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             : msg
         ));
         if (onComplete) {
-          setTimeout(onComplete, 300);
+          setTimeout(onComplete, 50);
         }
       }
     };
     
-    setTimeout(typeNextChar, 500);
+    setTimeout(typeNextWord, 50);
   }, []);
 
   // Добавляем пользовательское сообщение
@@ -402,10 +414,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
 
     setMessages(prev => [...prev, message]);
-    // Не делаем автоскролл во время переключения Visual Tips
-    if (true) {
-      scrollToBottom();
-    }
+    // Scroll to the new message once when it appears
+    scrollToNewMessage();
   };
 
 
@@ -424,12 +434,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     // Очищаем поле ввода сразу
     setUserInput("");
     
-    // Проверяем режим: Pro Mode = AI, Learn/Create = статичные шаги
+    // Проверяем режим: Pro Mode = AI, Create Mode = AI, Learn Mode = статичные шаги (ИЛИ AI активирован после step 6)
     const isProMode = selectedLearnLevel === 'pro';
-    console.log('[FunctionalChat] Is Pro Mode:', isProMode);
+    const isCreateMode = selectedLearnLevel === 'create';
+    const isLearnModeAI = selectedLearnLevel === 'learn' && learnModeAIActive;
+    const shouldUseAI = isProMode || isCreateMode || isLearnModeAI;
     
-    if (isProMode) {
-      console.log('[FunctionalChat] Pro Mode: Processing message');
+    console.log('[FunctionalChat] Is Pro Mode:', isProMode);
+    console.log('[FunctionalChat] Is Create Mode:', isCreateMode);
+    console.log('[FunctionalChat] Learn Mode AI Active:', isLearnModeAI);
+    console.log('[FunctionalChat] Should Use AI:', shouldUseAI);
+    
+    if (shouldUseAI) {
+      console.log('[FunctionalChat] AI Mode: Processing message', { isProMode, isCreateMode, isLearnModeAI });
       setShowOptions(false);
       setShowGenres(false);
       setShowReadyButton(false);
@@ -477,6 +494,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         console.log('[FunctionalChat] Pro Mode: Added user message and thinking, total messages:', newMessages.length);
         console.log('[FunctionalChat] Pro Mode: User message:', userMessage.content);
         
+        // Скролл к новому сообщению после обновления
+        setTimeout(() => scrollToNewMessage(), 50);
+        
         // Формируем историю разговора (без thinking сообщения)
         const conversationHistory = newMessages
           .filter(msg => {
@@ -493,8 +513,18 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         console.log('[FunctionalChat] Pro Mode: Conversation history:', conversationHistory.map(m => ({ type: m.type, content: m.content.substring(0, 50) })));
         console.log('[FunctionalChat] Pro Mode: Sending to ChatService.sendMessage...');
         
+        // Map selectedLearnLevel to AI mode
+        let aiMode: 'pro' | 'create' | 'learn' = 'create'; // default
+        if (selectedLearnLevel === 'pro') {
+          aiMode = 'pro';
+        } else if (selectedLearnLevel === 'create') {
+          aiMode = 'create';
+        } else if (learnModeAIActive) {
+          aiMode = 'learn';
+        }
+        
         // Отправляем запрос асинхронно
-        ChatService.sendMessage(messageText, conversationHistory)
+        ChatService.sendMessage(messageText, conversationHistory, aiMode)
           .then(aiResponse => {
             console.log('[FunctionalChat] Pro Mode: Received AI response, length:', aiResponse?.length || 0);
             
@@ -525,10 +555,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         return newMessages;
       });
       
-      // Скроллим вниз после добавления сообщения
-      setTimeout(() => {
-        scrollToBottom();
-      }, 100);
+      // Manual scrolling only - let user control
       
       return;
     }
@@ -565,22 +592,27 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               setMessages(prev => prev.filter(msg => !msg.isThinking));
               
               // Переходим к следующему шагу
-              const realNextStep = chatSteps[nextStep.nextStep];
-              if (realNextStep) {
-                setCurrentStep(nextStep.nextStep);
-                addAIMessage(realNextStep.ai, () => {
+              if (nextStep && nextStep.nextStep !== undefined) {
+                const realNextStep = chatSteps[nextStep.nextStep];
+                if (realNextStep) {
+                  setCurrentStep(nextStep.nextStep);
+                  addAIMessage(realNextStep.ai, () => {
                   if (realNextStep.id === 3) {
                     setShowReadyButton(true);
                     // Кнопка появляется с прозрачным background, без подсветки
                   }
-                });
+                  });
+                }
               }
             }, 2000); // 2 секунды задержка для "thinking"
           }, true); // true = прозрачный текст
         } else {
           setTimeout(() => {
-            setCurrentStep(currentStepData.nextStep);
-            addAIMessage(nextStep.ai, () => {
+            if (currentStepData.nextStep !== undefined) {
+              setCurrentStep(currentStepData.nextStep);
+              const nextStep = chatSteps[currentStepData.nextStep];
+              if (nextStep) {
+                addAIMessage(nextStep.ai, () => {
               // Показываем соответствующие опции для следующего шага после завершения анимации
               setTimeout(() => {
                 if (nextStep.id === 1) {
@@ -606,6 +638,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                           clearInterval(typeTimer);
                         }
                       }, 50); // Скорость печатания
+                      // Скролл к кнопке
+                      scrollToNewMessage();
                     }, 3000); // Задержка после завершения анимации печатания
                   }, 500); // Задержка после завершения анимации печатания
                 } else if (nextStep.id === 5) {
@@ -614,10 +648,48 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   // после завершения анимации печатания, аналогично Step 4
                   setTimeout(() => {
                     setShowOptions(true);
+                    // Автоматически показываем "Completed. Next step" через 3 секунды
+                    // даже если пользователь не нажал "Show visual tips"
+                    setTimeout(() => {
+                      setShowCompletedStep(true);
+                      // Анимация печатания для "Completed. Next step."
+                      const text = "Completed. Next step.";
+                      let charIndex = 0;
+                      const typeTimer = setInterval(() => {
+                        if (charIndex < text.length) {
+                          setCompletedStepText(text.substring(0, charIndex + 1));
+                          charIndex++;
+                        } else {
+                          clearInterval(typeTimer);
+                        }
+                      }, 50); // Скорость печатания
+                      // Скролл к кнопке
+                      scrollToNewMessage();
+                    }, 3000); // 3 секунды задержка
+                  }, 500); // Задержка после завершения анимации печатания
+                } else if (nextStep.id === 6) {
+                  // Последний шаг Learn mode - показываем кнопку "Completed. Next step" с анимацией
+                  setTimeout(() => {
+                    setShowCompletedStep(true);
+                    // Анимация печатания для "Completed. Next step."
+                    const text = "Completed. Next step.";
+                    let charIndex = 0;
+                    const typeTimer = setInterval(() => {
+                      if (charIndex < text.length) {
+                        setCompletedStepText(text.substring(0, charIndex + 1));
+                        charIndex++;
+                      } else {
+                        clearInterval(typeTimer);
+                      }
+                    }, 50); // Скорость печатания
+                    // Скролл к кнопке
+                    scrollToNewMessage();
                   }, 500); // Задержка после завершения анимации печатания
                 }
               }, 500); // Задержка после завершения анимации печатания
-            });
+                });
+              }
+            }
           }, 1200);
         }
       }
@@ -653,9 +725,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Автоскролл при добавлении новых сообщений
   useEffect(() => {
     // Не делаем автоскролл во время переключения Visual Tips
-    if (true) {
-      scrollToBottom();
-    }
   }, [messages, showOptions, showGenres, showReadyButton, showStepContent, showCompletedStep, isTogglingVisualTips]);
 
   // Notify host (JUCE wrapper) about expanded state for Visual Tips / Analysis
@@ -968,6 +1037,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     // Обработка специальных опций - не добавляем в поле ввода
     if (option === "Show visual tips") {
       handleVisualTipsToggle();
+      // На шаге 5 (Step 2 of 7) после показания Visual Tips показываем кнопку "Completed. Next step"
+      if (currentStep === 5) {
+        setTimeout(() => {
+          setShowCompletedStep(true);
+          setCompletedStepText("Completed. Next step.");
+        }, 500);
+      }
       return;
     }
     
@@ -978,7 +1054,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     
     // Для остальных опций помещаем текст в поле ввода
     setUserInput(option);
-  }, [handleVisualTipsToggle]);
+  }, [handleVisualTipsToggle, currentStep]);
 
 
   const mainContent = (
@@ -1126,8 +1202,40 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                 setShowCompletedStep(false);
                 setCompletedStepText("");
                 
-                // Переходим к следующему шагу
+                // Переходим к следующему шагу или запускаем AI анализ
                 const currentStepData = chatSteps.find(step => step.id === currentStep);
+                
+                // Если текущий шаг требует AI анализа контекста
+                if (currentStepData && currentStepData.useAIAnalysis) {
+                  console.log('[Learn Mode → AI Analysis] Triggering AI context analysis');
+                  
+                  // Активируем AI диалог в Learn mode (остаёмся в Learn, но включаем AI)
+                  setLearnModeAIActive(true);
+                  console.log('[Learn Mode → AI Analysis] Activated AI in Learn Mode');
+                  
+                  // Собираем контекст Learn mode
+                  const learnContext = messages
+                    .filter(msg => !msg.isThinking && msg.content.trim() !== '')
+                    .map(msg => ({
+                      type: msg.type,
+                      content: msg.content
+                    }));
+                  
+                  // Отправляем контекст в backend для анализа
+                  ChatService.analyzeLearnModeContext(learnContext)
+                    .then(aiResponse => {
+                      console.log('[Learn Mode → AI Analysis] Received analysis:', aiResponse.substring(0, 100) + '...');
+                      // AI анализирует контекст и предлагает продолжение
+                      addAIMessage(aiResponse);
+                    })
+                    .catch(error => {
+                      console.error('[Learn Mode → AI Analysis] Error:', error);
+                      addAIMessage("Let's continue building your track! What would you like to work on next?");
+                    });
+                  return;
+                }
+                
+                // Обычный переход к следующему шагу
                 if (currentStepData && currentStepData.nextStep !== undefined) {
                   const nextStep = chatSteps[currentStepData.nextStep];
                   if (nextStep) {
@@ -1158,6 +1266,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                           clearInterval(typeTimer);
                         }
                       }, 50); // Скорость печатания
+                      // Скролл к кнопке
+                      scrollToNewMessage();
                     }, 3000); // Задержка после завершения анимации печатания
                   }, 500); // Задержка после завершения анимации печатания
                 } else if (nextStep.id === 5) {
@@ -1165,6 +1275,42 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   // Показываем кнопку "Show visual tips" после завершения анимации
                   setTimeout(() => {
                     setShowOptions(true);
+                    // Автоматически показываем "Completed. Next step" через 3 секунды
+                    // даже если пользователь не нажал "Show visual tips"
+                    setTimeout(() => {
+                      setShowCompletedStep(true);
+                      // Анимация печатания для "Completed. Next step."
+                      const text = "Completed. Next step.";
+                      let charIndex = 0;
+                      const typeTimer = setInterval(() => {
+                        if (charIndex < text.length) {
+                          setCompletedStepText(text.substring(0, charIndex + 1));
+                          charIndex++;
+                        } else {
+                          clearInterval(typeTimer);
+                        }
+                      }, 50); // Скорость печатания
+                      // Скролл к кнопке
+                      scrollToNewMessage();
+                    }, 3000); // 3 секунды задержка
+                  }, 500); // Задержка после завершения анимации печатания
+                } else if (nextStep.id === 6) {
+                  // Последний шаг Learn mode - показываем кнопку "Completed. Next step" с анимацией
+                  setTimeout(() => {
+                    setShowCompletedStep(true);
+                    // Анимация печатания для "Completed. Next step."
+                    const text = "Completed. Next step.";
+                    let charIndex = 0;
+                    const typeTimer = setInterval(() => {
+                      if (charIndex < text.length) {
+                        setCompletedStepText(text.substring(0, charIndex + 1));
+                        charIndex++;
+                      } else {
+                        clearInterval(typeTimer);
+                      }
+                    }, 50); // Скорость печатания
+                    // Скролл к кнопке
+                    scrollToNewMessage();
                   }, 500); // Задержка после завершения анимации печатания
                 }
               }, 500); // Задержка после завершения анимации печатания
@@ -1180,31 +1326,31 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             <div
               className={`absolute bottom-[10px] left-[10px] h-[116px] rounded-[7px] backdrop-blur-[18.5px] transition-all duration-500 ease-out ${
                 showVisualTips ? 'w-[357px]' : 'w-[357px]'
-              } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} bg-[#ffffff0d] border border-white/5 text-white`}
+              } ${userInput ? 'ring-2 ring-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} bg-[#ffffff0d] border border-white/5 text-white overflow-hidden`}
               style={{
                 transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
               }}
             >
-              <input
-                type="text"
+              <textarea
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
+                  if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSendMessage();
                   }
                 }}
                 placeholder="Message..."
-                className="absolute top-[10px] left-[12px] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b]"
+                className="absolute top-[10px] left-[12px] w-[calc(100%-55px)] text-white bg-transparent border-none outline-none placeholder:text-[#ffffff6b] resize-none overflow-hidden"
                 style={{ 
-                  width: 'calc(100% - 100px)',
                   fontFamily: 'var(--body-font-family)',
                   fontSize: 'var(--body-font-size)',
                   fontStyle: 'var(--body-font-style)',
                   fontWeight: 'var(--body-font-weight)',
                   letterSpacing: 'var(--body-letter-spacing)',
-                  lineHeight: 'var(--body-line-height)'
+                  lineHeight: 'var(--body-line-height)',
+                  height: '60px',
+                  overflowY: 'hidden'
                 }}
               />
 

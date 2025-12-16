@@ -88,8 +88,7 @@ const UserBadgeIcon = ({ className = "" }: { className?: string }) => (
   </svg>
 );
 
-export const Frame = ({ projectName = "New project", currentStep = 1, totalSteps = 7, completedSteps = 0, onBackToProjects }: FrameProps): JSX.Element => {
-  const [isOpen, setIsOpen] = useState(false);
+export const Frame = ({ projectName = "New project", totalSteps = 7, completedSteps = 0, onBackToProjects }: FrameProps): JSX.Element => {
   const [isStepsDropdownOpen, setIsStepsDropdownOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [leftArrowHover, setLeftArrowHover] = useState(false);

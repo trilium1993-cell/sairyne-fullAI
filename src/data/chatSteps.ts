@@ -8,7 +8,8 @@ export interface ChatStep {
   ai: string;
   isThinking?: boolean;
   options?: string[];
-  nextStep: number; // Убираем optional, так как всегда должен быть следующий шаг (кроме последнего)
+  nextStep?: number; // Optional для последнего шага
+  useAIAnalysis?: boolean; // Триггер для AI анализа контекста Learn mode
 }
 
 /**
@@ -55,7 +56,7 @@ export const createChatSteps = (projectName: string): ChatStep[] => [
   {
     id: 6,
     ai: "✅ Kick drum setup completed. Proceed to next phase.",
-    nextStep: 7 // Добавляем nextStep для совместимости
+    useAIAnalysis: true // Триггер для AI анализа контекста и продолжения
   }
 ];
 

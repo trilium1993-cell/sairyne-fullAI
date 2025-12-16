@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 import mongoose from 'mongoose';
 import authRoutes from './routes/auth.js';
 import emailService from './services/emailService.js';
+import { getSystemPrompt } from './prompts/sairyneSystemPrompts.js';
 
 // Load environment variables
 dotenv.config();
@@ -154,7 +155,7 @@ app.post('/analytics/event', (req, res) => {
 // Chat endpoint
 app.post('/api/chat/message', async (req, res) => {
   try {
-    const { message, conversationHistory = [] } = req.body;
+    const { message, conversationHistory = [], mode = 'create' } = req.body;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -164,9 +165,12 @@ app.post('/api/chat/message', async (req, res) => {
       return res.status(503).json({ error: 'AI service temporarily unavailable. Please configure OPENAI_API_KEY.' });
     }
 
+    // Get the appropriate system prompt based on the mode
+    const systemPrompt = getSystemPrompt(mode);
+
     // Build messages array for OpenAI
     const messages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemPrompt },
       ...conversationHistory.map(msg => ({
         role: msg.type === 'user' ? 'user' : 'assistant',
         content: msg.content
@@ -212,6 +216,66 @@ app.post('/api/chat/message', async (req, res) => {
       error: 'Failed to generate response',
       details: error.message || 'Unknown error',
       code: error.code || 'UNKNOWN'
+    });
+  }
+});
+
+// ================================
+// ANALYZE LEARN MODE CONTEXT & CONTINUE WITH AI
+// ================================
+app.post('/api/chat/analyze-learn-context', async (req, res) => {
+  try {
+    const { learnContext = [] } = req.body;
+
+    if (!openai) {
+      return res.status(503).json({ error: 'AI service temporarily unavailable. Please configure OPENAI_API_KEY.' });
+    }
+
+    // Build summary of what was learned
+    const learnSummary = learnContext.map(msg => `${msg.type === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n\n');
+
+    // Use the LEARN MODE system prompt from our prompts file
+    const systemPrompt = getSystemPrompt('learn');
+
+    // Build messages for OpenAI
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Here's what I learned in the tutorial:\n\n${learnSummary}\n\nNow help me continue building my track!` }
+    ];
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: messages,
+      temperature: 0.8,
+      max_tokens: 400
+    });
+
+    const aiResponse = completion.choices[0].message.content;
+
+    console.log('[Learn Mode Analysis] Generated continuation:', aiResponse.substring(0, 100) + '...');
+
+    res.json({
+      response: aiResponse,
+      timestamp: Date.now()
+    });
+
+  } catch (error) {
+    if (isDevelopment) {
+      console.error('[Learn Mode Analysis] OpenAI API Error:', error);
+    }
+    
+    if (error.status === 401) {
+      return res.status(401).json({ error: 'Invalid OpenAI API key' });
+    }
+    
+    if (error.status === 429) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+    }
+
+    res.status(500).json({ 
+      error: 'Failed to analyze learning context',
+      details: error.message || 'Unknown error'
     });
   }
 });

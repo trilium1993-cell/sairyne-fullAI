@@ -1,4 +1,19 @@
-import React from "react";
+
+// CSS для fade-in анимации слов
+const fadeInStyle = `
+  @keyframes fadeInWord {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  .fade-in-word {
+    animation: fadeInWord 0.25s ease-in forwards;
+  }
+`;
 
 interface ChatMessageProps {
   message: string;
@@ -7,6 +22,14 @@ interface ChatMessageProps {
   avatar?: string;
   className?: string;
   isThinking?: boolean;
+}
+
+// Добавим стили в head
+if (typeof document !== 'undefined' && !document.getElementById('fade-in-styles')) {
+  const style = document.createElement('style');
+  style.id = 'fade-in-styles';
+  style.textContent = fadeInStyle;
+  document.head.appendChild(style);
 }
 
 export const ChatMessage = ({ 
@@ -24,7 +47,7 @@ export const ChatMessage = ({
   
   const messageClasses = isUser ? userClasses : systemClasses;
 
-  // Функция для разбивки текста на абзацы с горизонтальными линиями
+  // Функция для разбивки текста на абзацы с горизонтальными линиями и fade-in эффектом на слова
   const renderMessageWithLines = (text: string) => {
     if (isUser) {
       // Для пользовательских сообщений просто возвращаем текст
@@ -34,19 +57,29 @@ export const ChatMessage = ({
     // Разбиваем текст на абзацы по двойным переносам строк
     const paragraphs = text.split('\n\n');
     
-    return paragraphs.map((paragraph, index) => (
-      <div key={index}>
-        <p className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] whitespace-pre-line">
-          {paragraph}
-        </p>
-        {/* Добавляем горизонтальную линию между абзацами, но не после последнего */}
-        {index < paragraphs.length - 1 && (
-          <div className="my-3">
-            <div className="w-full h-px bg-white/10"></div>
-          </div>
-        )}
-      </div>
-    ));
+    return paragraphs.map((paragraph, index) => {
+      // Разбиваем абзац на слова и применяем fade-in эффект
+      const words = paragraph.split(' ');
+      const wordsWithFadeIn = words.map((word, wordIndex) => (
+        <span key={wordIndex} className="fade-in-word">
+          {word}{wordIndex < words.length - 1 ? ' ' : ''}
+        </span>
+      ));
+      
+      return (
+        <div key={index}>
+          <p className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] whitespace-pre-line">
+            {wordsWithFadeIn}
+          </p>
+          {/* Добавляем горизонтальную линию между абзацами, но не после последнего */}
+          {index < paragraphs.length - 1 && (
+            <div className="my-3">
+              <div className="w-full h-px bg-white/10"></div>
+            </div>
+          )}
+        </div>
+      );
+    });
   };
   
   const fallbackAvatar = "https://c.animaapp.com/hOiZ2IT6/img/b56f1665-0403-49d2-b00e-ec2a27378422-1@2x.png";

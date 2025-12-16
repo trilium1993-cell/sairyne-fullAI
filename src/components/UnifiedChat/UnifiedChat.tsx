@@ -18,26 +18,30 @@ interface UnifiedChatProps {
   onBack: () => void;
 }
 
-export const UnifiedChat = ({ onNext, onBack }: UnifiedChatProps): JSX.Element => {
+export const UnifiedChat = ({ onNext }: UnifiedChatProps): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
   const [userInput, setUserInput] = useState("");
-  const [selectedOption, setSelectedOption] = useState("");
-  const [selectedGenre, setSelectedGenre] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
-  const [showResponse, setShowResponse] = useState(false);
   const [showReadyButton, setShowReadyButton] = useState(false);
   const [showStepContent, setShowStepContent] = useState(false);
   const [optionTexts, setOptionTexts] = useState<string[]>(["", "", ""]);
   const [genreTexts, setGenreTexts] = useState<string[]>(["", "", "", ""]);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Автоматический скролл вниз
-  const scrollToBottom = () => {
+  // Scroll to show new message once, then let user scroll manually (like ChatGPT)
+  const scrollToNewMessage = () => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+      // Wait for DOM to update before scrolling (50ms delay)
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          const container = chatContainerRef.current;
+          const targetScroll = container.scrollHeight - container.clientHeight;
+          container.scrollTop = targetScroll; // Instant scroll, one time only
+        }
+      }, 50);
     }
   };
 
@@ -55,11 +59,6 @@ export const UnifiedChat = ({ onNext, onBack }: UnifiedChatProps): JSX.Element =
     }
   }, []);
 
-  // Автоматический скролл при изменении сообщений
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, showOptions, showGenres, showResponse, showReadyButton, showStepContent]);
-
   // Добавляем сообщение
   const addMessage = (type: 'ai' | 'user', content: string, avatar?: string, isTyping = false) => {
     const message: Message = {
@@ -71,6 +70,7 @@ export const UnifiedChat = ({ onNext, onBack }: UnifiedChatProps): JSX.Element =
       isTyping
     };
     setMessages(prev => [...prev, message]);
+    scrollToNewMessage();
   };
 
   // Обновляем последнее сообщение (для анимации печатания)
@@ -152,7 +152,6 @@ export const UnifiedChat = ({ onNext, onBack }: UnifiedChatProps): JSX.Element =
 
   // Обработка выбора опции (Chat1 -> Chat2)
   const handleOptionClick = (option: string) => {
-    setSelectedOption(option);
     addMessage('user', option);
     
     setTimeout(() => {
@@ -192,7 +191,6 @@ export const UnifiedChat = ({ onNext, onBack }: UnifiedChatProps): JSX.Element =
 
   // Обработка выбора жанра (Chat2 -> Chat3)
   const handleGenreClick = (genre: string) => {
-    setSelectedGenre(genre);
     addMessage('user', genre);
     
     setTimeout(() => {
