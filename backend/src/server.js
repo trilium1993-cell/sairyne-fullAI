@@ -45,18 +45,19 @@ if (isDevelopment) {
   console.log('  PORT:', PORT);
 }
 
-// DEBUG MODE: Fully open CORS for WebView2 debugging
-// TODO: In production, switch to strict whitelist below
+// CORS: be максимально совместимым с JUCE WebView (часто file:// => Origin: null)
+// Мы не используем cookie-сессии, поэтому credentials не нужны.
+// Это позволяет Access-Control-Allow-Origin: * и убирает блокировки для Origin: null.
 const corsOptions = {
-  origin: true, // Allow ALL origins (for WebView2 testing)
-  credentials: true,
+  origin: '*',
+  credentials: false,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   optionsSuccessStatus: 204
 };
 
 if (isDevelopment) {
-  console.log('⚠️ CORS MODE: OPEN FOR DEBUG (all origins allowed)');
+  console.log('⚠️ CORS MODE: WILDCARD (*), credentials disabled (JUCE file:// friendly)');
 }
 
 // STRICT MODE - uncomment in production
