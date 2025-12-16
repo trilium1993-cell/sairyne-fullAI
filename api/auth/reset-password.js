@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import validator from 'validator';
 import { getMongoClient } from '../_lib/mongo.js';
 
@@ -29,31 +28,40 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     return res.end();
   }
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return sendJson(res, 405, { error: 'Method not allowed' });
   }
 
   try {
-    const { email, password } = parseBody(req);
-    if (!email || !validator.isEmail(String(email))) return sendJson(res, 400, { error: 'Valid email is required' });
-    if (!password || String(password).length < 8) return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
+    const { email, newPassword } = parseBody(req);
+    if (!email || !validator.isEmail(String(email))) {
+      return sendJson(res, 400, { error: 'Valid email is required' });
+    }
+    if (!newPassword || String(newPassword).length < 8) {
+      return sendJson(res, 400, { error: 'Password must be at least 8 characters' });
+    }
 
     const client = await getMongoClient();
     const db = client.db('sairynereg');
     const users = db.collection('users');
-    const user = await users.findOne({ email: String(email).toLowerCase() });
-    if (!user?.password) return sendJson(res, 401, { error: 'Invalid email or password' });
 
-    const ok = await bcrypt.compare(String(password), String(user.password));
-    if (!ok) return sendJson(res, 401, { error: 'Invalid email or password' });
+    const normalizedEmail = String(email).toLowerCase();
+    const user = await users.findOne({ email: normalizedEmail });
+    if (!user) {
+      return sendJson(res, 404, { error: 'User not found' });
+    }
 
-    const secret = process.env.JWT_SECRET || 'dev-secret-key-change-in-production';
-    const token = jwt.sign({ userId: String(user._id), email: String(user.email) }, secret, { expiresIn: '7d' });
+    const hash = await bcrypt.hash(String(newPassword), 10);
+    await users.updateOne(
+      { email: normalizedEmail },
+      { $set: { password: hash, updatedAt: new Date() } }
+    );
 
-    return sendJson(res, 200, { status: 'success', token, user: { _id: String(user._id), email: user.email, nick: user.nick ?? null } });
+    return sendJson(res, 200, { status: 'success', message: 'Password updated successfully', email: normalizedEmail });
   } catch (e) {
-    return sendJson(res, 500, { error: e?.message || 'Login failed' });
+    return sendJson(res, 500, { error: e?.message || 'Password reset failed' });
   }
 }
 
