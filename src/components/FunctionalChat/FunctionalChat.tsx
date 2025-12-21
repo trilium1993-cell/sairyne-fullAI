@@ -879,8 +879,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (IS_DEV) {
       console.debug('[learn] toggle panel');
     }
-    setShowLearnMode(!showLearnMode);
-  }, [showLearnMode]);
+    setShowLearnMode((prev) => !prev);
+  }, []);
 
   const handleLearnLevelSelect = useCallback((level: string) => {
     console.log('[FunctionalChat] Switching mode from', previousModeRef.current, 'to', level);
@@ -1420,7 +1420,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
               <button
                 onClick={handleLearn}
-                className="absolute bottom-[6px] left-[93px] flex items-center gap-1 rounded-[6px] px-[7px] py-[7px] cursor-pointer transition-all duration-300 ease-out bg-[#211829] border border-solid border-[#e8ceff21] text-white hover:bg-[#2a1f35] hover:border-[#e8ceff40]"
+                aria-expanded={showLearnMode}
+                className={`absolute bottom-[6px] left-[93px] flex items-center gap-1 rounded-[6px] px-[7px] py-[7px] cursor-pointer transition-all duration-300 ease-out bg-[#211829] border border-solid text-white hover:bg-[#2a1f35] hover:border-[#e8ceff40] ${
+                  showLearnMode
+                    ? 'border-[#e8ceff80] ring-2 ring-purple-500/40'
+                    : 'border-[#e8ceff21]'
+                }`}
                 style={{
                   transitionTimingFunction: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
                 }}
@@ -1442,6 +1447,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   className="w-[6.93px] h-[4.5px]"
                   alt="Select level"
                   src={CARET_ICON}
+                  style={{
+                    transform: showLearnMode ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 200ms ease'
+                  }}
                 />
               </button>
 
