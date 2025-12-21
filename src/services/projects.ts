@@ -1,6 +1,8 @@
 import { getActiveUserEmail } from "./auth";
 import { safeGetItem, safeSetItem, safeRemoveItem, isLocalStorageAvailable } from '../utils/storage';
 
+const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
+
 export interface StoredProject {
   id: number;
   name: string;
@@ -43,42 +45,48 @@ function parseProjects(): StoredProject[] {
 function persistProjects(projects: StoredProject[]) {
   if (typeof window === "undefined") return;
   
-  console.log('[Projects] 🔄 persistProjects called with', projects.length, 'projects');
+  if (IS_DEV) console.log('[Projects] 🔄 persistProjects called with', projects.length, 'projects');
   const projectsJson = JSON.stringify(projects);
-  console.log('[Projects] 📦 Projects JSON length:', projectsJson.length);
-  console.log('[Projects] 📦 Projects JSON preview:', projectsJson.substring(0, 200));
+  if (IS_DEV) {
+    console.log('[Projects] 📦 Projects JSON length:', projectsJson.length);
+    console.log('[Projects] 📦 Projects JSON preview:', projectsJson.substring(0, 200));
+  }
   
   // Debug: send message to JUCE to log this call
-  try {
-    if (typeof window !== 'undefined') {
-      const debugUrl = `juce://debug?message=persistProjects_called_with_${projects.length}_projects_json_length_${projectsJson.length}`;
-      // Try top/parent first (for iframe), fallback to window
-      if (window.top && window.top !== window) {
-        window.top.location.href = debugUrl;
-      } else if (window.parent && window.parent !== window) {
-        window.parent.location.href = debugUrl;
-      } else if (window.location) {
-        window.location.href = debugUrl;
+  if (IS_DEV) {
+    try {
+      if (typeof window !== 'undefined') {
+        const debugUrl = `juce://debug?message=persistProjects_called_with_${projects.length}_projects_json_length_${projectsJson.length}`;
+        // Try top/parent first (for iframe), fallback to window
+        if (window.top && window.top !== window) {
+          window.top.location.href = debugUrl;
+        } else if (window.parent && window.parent !== window) {
+          window.parent.location.href = debugUrl;
+        } else if (window.location) {
+          window.location.href = debugUrl;
+        }
       }
+    } catch (e) {
+      console.warn('[Projects] Failed to send debug message:', e);
     }
-  } catch (e) {
-    console.warn('[Projects] Failed to send debug message:', e);
   }
   
   // safeSetItem will handle JUCE fallback automatically
-  console.log('[Projects] 🔄 Calling safeSetItem for', PROJECTS_KEY);
-  console.log('[Projects] 🔄 Checking if window.saveToJuce exists:', typeof (window as any).saveToJuce);
+  if (IS_DEV) {
+    console.log('[Projects] 🔄 Calling safeSetItem for', PROJECTS_KEY);
+    console.log('[Projects] 🔄 Checking if window.saveToJuce exists:', typeof (window as any).saveToJuce);
+  }
   
   const success = safeSetItem(PROJECTS_KEY, projectsJson);
   if (!success) {
     console.warn('[Projects] ⚠️ Failed to persist projects - localStorage blocked and JUCE not available');
   } else {
-    console.log('[Projects] ✅ persistProjects completed successfully');
+    if (IS_DEV) console.log('[Projects] ✅ persistProjects completed successfully');
     // Double-check: try to read it back immediately
     setTimeout(() => {
       const readBack = safeGetItem(PROJECTS_KEY);
       if (readBack) {
-        console.log('[Projects] ✅ Verified: projects data persisted successfully, length:', readBack.length);
+        if (IS_DEV) console.log('[Projects] ✅ Verified: projects data persisted successfully, length:', readBack.length);
       } else {
         console.warn('[Projects] ⚠️ Warning: projects data not found after save, length:', readBack?.length || 0);
       }
@@ -126,22 +134,24 @@ export function saveProjects(projects: StoredProject[]): void {
 }
 
 export function createProject(name?: string): StoredProject {
-  console.log('[Projects] 🔄 createProject called with name:', name);
+  if (IS_DEV) console.log('[Projects] 🔄 createProject called with name:', name);
   
   // Debug: send message to JUCE immediately
-  try {
-    if (typeof window !== 'undefined') {
-      const debugUrl = `juce://debug?message=createProject_called_with_name_${name || 'undefined'}`;
-      if (window.top && window.top !== window) {
-        window.top.location.href = debugUrl;
-      } else if (window.parent && window.parent !== window) {
-        window.parent.location.href = debugUrl;
-      } else if (window.location) {
-        window.location.href = debugUrl;
+  if (IS_DEV) {
+    try {
+      if (typeof window !== 'undefined') {
+        const debugUrl = `juce://debug?message=createProject_called_with_name_${name || 'undefined'}`;
+        if (window.top && window.top !== window) {
+          window.top.location.href = debugUrl;
+        } else if (window.parent && window.parent !== window) {
+          window.parent.location.href = debugUrl;
+        } else if (window.location) {
+          window.location.href = debugUrl;
+        }
       }
+    } catch (e) {
+      console.warn('[Projects] Failed to send debug message from createProject:', e);
     }
-  } catch (e) {
-    console.warn('[Projects] Failed to send debug message from createProject:', e);
   }
   
   const ownerEmail = resolveOwnerEmail(getActiveUserEmail());
@@ -154,7 +164,7 @@ export function createProject(name?: string): StoredProject {
 
   const projects = parseProjects();
   projects.push(newProject);
-  console.log('[Projects] 🔄 About to call persistProjects - projects array:', JSON.stringify(projects));
+  if (IS_DEV) console.log('[Projects] 🔄 About to call persistProjects - projects array:', JSON.stringify(projects));
   persistProjects(projects);
   return newProject;
 }

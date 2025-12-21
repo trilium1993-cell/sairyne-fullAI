@@ -3,6 +3,8 @@
  * Always uses JUCE for persistence, localStorage is only a UI cache
  */
 
+const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
+
 // In-memory storage as fallback when localStorage is not available
 const memoryStorage: Map<string, string> = new Map();
 
@@ -20,7 +22,7 @@ if (typeof window !== 'undefined' && (window as any).__sairyneStorage) {
   const windowStorage = (window as any).__sairyneStorage as Map<string, string>;
   windowStorage.forEach((value, key) => {
     memoryStorage.set(key, value);
-    console.log('[Storage] 🔄 Initialized from __sairyneStorage:', key);
+    if (IS_DEV) console.log('[Storage] 🔄 Initialized from __sairyneStorage:', key);
   });
 }
 
@@ -34,7 +36,7 @@ function syncFromWindowStorage() {
       const existing = memoryStorage.get(key);
       if (existing !== value) {
         memoryStorage.set(key, value);
-        console.log('[Storage] 🔄 Synced from __sairyneStorage (overwrite):', key);
+        if (IS_DEV) console.log('[Storage] 🔄 Synced from __sairyneStorage (overwrite):', key);
       }
     });
   }
@@ -50,7 +52,7 @@ const NO_LOCALSTORAGE_KEYS = new Set<string>([
  */
 export function isLocalStorageAvailable(): boolean {
   if (typeof window === 'undefined') {
-    console.log('[Storage] window is undefined');
+    if (IS_DEV) console.log('[Storage] window is undefined');
     return false;
   }
 
@@ -62,11 +64,11 @@ export function isLocalStorageAvailable(): boolean {
     
     // Проверяем, что данные действительно сохранились и читаются
     const isAvailable = retrieved === 'test';
-    console.log('[Storage] localStorage test:', isAvailable ? 'available' : 'not available');
+    if (IS_DEV) console.log('[Storage] localStorage test:', isAvailable ? 'available' : 'not available');
     return isAvailable;
   } catch (error) {
     // localStorage заблокирован или недоступен
-    console.warn('[Storage] localStorage test failed:', error);
+    if (IS_DEV) console.warn('[Storage] localStorage test failed:', error);
     return false;
   }
 }
@@ -82,7 +84,7 @@ export function safeGetItem(key: string): string | null {
   // First, try memory storage (for data loaded from JUCE)
   if (memoryStorage.has(key)) {
     const value = memoryStorage.get(key);
-    console.log('[Storage] ✅ Retrieved from memory:', key, value ? `value length: ${value.length}` : 'null');
+    if (IS_DEV) console.log('[Storage] ✅ Retrieved from memory:', key, value ? `value length: ${value.length}` : 'null');
     return value || null;
   }
 
@@ -91,13 +93,13 @@ export function safeGetItem(key: string): string | null {
     try {
       const value = window.localStorage.getItem(key);
       if (value !== null) {
-        console.log('[Storage] ✅ Retrieved from localStorage cache:', key, `value length: ${value.length}`);
+        if (IS_DEV) console.log('[Storage] ✅ Retrieved from localStorage cache:', key, `value length: ${value.length}`);
         // Also store in memory for faster access next time
         memoryStorage.set(key, value);
         return value;
       }
     } catch (error) {
-      console.warn('[Storage] localStorage.getItem failed:', error);
+      if (IS_DEV) console.warn('[Storage] localStorage.getItem failed:', error);
     }
   }
 
@@ -107,7 +109,7 @@ export function safeGetItem(key: string): string | null {
     if (windowStorage.has(key)) {
       const value = windowStorage.get(key);
       if (value) {
-        console.log('[Storage] ✅ Retrieved from window.__sairyneStorage:', key, `value length: ${value.length}`);
+        if (IS_DEV) console.log('[Storage] ✅ Retrieved from window.__sairyneStorage:', key, `value length: ${value.length}`);
         // Store in memory for faster access
         memoryStorage.set(key, value);
         return value;
@@ -118,20 +120,20 @@ export function safeGetItem(key: string): string | null {
   // Request from JUCE (async, will come via onJuceDataLoaded)
   // But prevent infinite loops - only request if not already pending
   if (!pendingLoads.has(key)) {
-    console.log('[Storage] 📤 Requesting from JUCE:', key);
+    if (IS_DEV) console.log('[Storage] 📤 Requesting from JUCE:', key);
     pendingLoads.add(key);
     
     // Clear pending flag after 5 seconds (in case response never comes)
     setTimeout(() => {
       pendingLoads.delete(key);
-      console.log('[Storage] ⏰ Pending timeout cleared for:', key);
+      if (IS_DEV) console.log('[Storage] ⏰ Pending timeout cleared for:', key);
     }, 5000);
     
     if (typeof window !== 'undefined' && (window as any).loadFromJuce) {
       (window as any).loadFromJuce(key);
     }
   } else {
-    console.log('[Storage] ⏳ Load request already pending for:', key, '- skipping duplicate request');
+    if (IS_DEV) console.log('[Storage] ⏳ Load request already pending for:', key, '- skipping duplicate request');
   }
 
   return null;
@@ -144,49 +146,51 @@ export function safeGetItem(key: string): string | null {
 export function safeSetItem(key: string, value: string): boolean {
   // Always store in memory first (for immediate access)
   memoryStorage.set(key, value);
-  console.log('[Storage] ✅ Stored in memory:', key, `value length: ${value.length}`);
-  console.log('[Storage] 🔍 Key type:', key);
-  console.log('[Storage] 🔍 Is sairyne_users?', key === 'sairyne_users');
-  console.log('[Storage] 🔍 Is sairyne_projects?', key === 'sairyne_projects');
+  if (IS_DEV) {
+    console.log('[Storage] ✅ Stored in memory:', key, `value length: ${value.length}`);
+    console.log('[Storage] 🔍 Key type:', key);
+    console.log('[Storage] 🔍 Is sairyne_users?', key === 'sairyne_users');
+    console.log('[Storage] 🔍 Is sairyne_projects?', key === 'sairyne_projects');
+  }
 
   // ALWAYS save to JUCE (this is the source of truth)
   try {
-    console.log('[Storage] 🔄 Saving to JUCE PropertiesFile:', key, `value length: ${value.length}`);
-    console.log('[Storage] 📦 Value preview (first 100 chars):', value.substring(0, 100));
-    console.log('[Storage] 🔍 Checking window.saveToJuce...');
-    console.log('[Storage] 🔍 window exists?', typeof window !== 'undefined');
-    console.log('[Storage] 🔍 window.saveToJuce exists?', typeof (window as any)?.saveToJuce !== 'undefined');
-    console.log('[Storage] 🔍 window.saveToJuce type:', typeof (window as any)?.saveToJuce);
+    if (IS_DEV) {
+      console.log('[Storage] 🔄 Saving to JUCE PropertiesFile:', key, `value length: ${value.length}`);
+      console.log('[Storage] 📦 Value preview (first 100 chars):', value.substring(0, 100));
+      console.log('[Storage] 🔍 Checking window.saveToJuce...');
+      console.log('[Storage] 🔍 window exists?', typeof window !== 'undefined');
+      console.log('[Storage] 🔍 window.saveToJuce exists?', typeof (window as any)?.saveToJuce !== 'undefined');
+      console.log('[Storage] 🔍 window.saveToJuce type:', typeof (window as any)?.saveToJuce);
+    }
     
     if (typeof window !== 'undefined' && (window as any).saveToJuce) {
-      console.log('[Storage] ✅ window.saveToJuce is available, calling it NOW...');
-      console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
+      if (IS_DEV) {
+        console.log('[Storage] ✅ window.saveToJuce is available, calling it NOW...');
+        console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
+      }
       (window as any).saveToJuce(key, value);
-      console.log('[Storage] ✅ saveToJuce called for:', key, '- waiting for response...');
-      
-      // Verify it was called
-      setTimeout(() => {
-        console.log('[Storage] 🔍 Post-call verification: checking if message was sent...');
-      }, 100);
+      if (IS_DEV) console.log('[Storage] ✅ saveToJuce called for:', key);
     } else {
-      console.error('[Storage] ❌ window.saveToJuce NOT AVAILABLE!');
-      console.error('[Storage] ❌ window object:', typeof window);
-      console.error('[Storage] ❌ window.saveToJuce type:', typeof (window as any)?.saveToJuce);
-      console.error('[Storage] ❌ This means juceBridge.ts was not loaded or onJuceInit was not called!');
+      if (IS_DEV) {
+        console.error('[Storage] ❌ window.saveToJuce NOT AVAILABLE!');
+        console.error('[Storage] ❌ window object:', typeof window);
+        console.error('[Storage] ❌ window.saveToJuce type:', typeof (window as any)?.saveToJuce);
+        console.error('[Storage] ❌ This means juceBridge.ts was not loaded or onJuceInit was not called!');
+      }
     }
   } catch (error) {
+    // Keep error log even in prod; persistence failures are important.
     console.error('[Storage] ❌ JUCE saveToJuce failed:', error);
-    console.error('[Storage] ❌ Error details:', error instanceof Error ? error.message : String(error));
-    console.error('[Storage] ❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
   }
 
   // Also save to localStorage as cache (but don't rely on it)
   if (isLocalStorageAvailable()) {
     try {
       window.localStorage.setItem(key, value);
-      console.log('[Storage] ✅ Saved to localStorage cache:', key);
+      if (IS_DEV) console.log('[Storage] ✅ Saved to localStorage cache:', key);
     } catch (error) {
-      console.warn('[Storage] ⚠️ localStorage.setItem failed:', error);
+      if (IS_DEV) console.warn('[Storage] ⚠️ localStorage.setItem failed:', error);
     }
   }
 
@@ -207,14 +211,26 @@ export function safeSetItem(key: string, value: string): boolean {
  * Safe localStorage.removeItem with error handling
  */
 export function safeRemoveItem(key: string): boolean {
-  if (!isLocalStorageAvailable()) {
-    return false;
+  // Always clear memory cache.
+  memoryStorage.delete(key);
+  if (typeof window !== 'undefined' && (window as any).__sairyneStorage) {
+    try {
+      (window as any).__sairyneStorage.delete(key);
+    } catch {}
   }
 
   try {
-    window.localStorage.removeItem(key);
-    // Also remove from memory cache
-    memoryStorage.delete(key);
+    if (isLocalStorageAvailable()) {
+      window.localStorage.removeItem(key);
+    }
+
+    // Clear persisted value in JUCE as well by writing empty string
+    try {
+      if (typeof window !== 'undefined' && (window as any).saveToJuce) {
+        (window as any).saveToJuce(key, '');
+      }
+    } catch {}
+
     // Notify listeners that key was cleared
     if (typeof window !== 'undefined') {
       try {

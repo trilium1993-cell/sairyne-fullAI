@@ -228,6 +228,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const previousModeRef = useRef<string>(selectedLearnLevel);
 
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
+  const MAX_MESSAGES_PER_MODE = 200;
   const resolveActiveSessionKey = () => {
     const ownerEmail = getActiveUserEmail();
     const selected = getSelectedProject();
@@ -266,6 +267,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isVisible: true,
       isTyping: false,
     }));
+
+  const trimMessages = (msgs: Message[]): Message[] => {
+    if (!Array.isArray(msgs)) return [];
+    if (msgs.length <= MAX_MESSAGES_PER_MODE) return msgs;
+    // Keep the most recent messages to cap storage size
+    return msgs.slice(msgs.length - MAX_MESSAGES_PER_MODE);
+  };
 
   const tryHydrateFromStorage = useCallback(() => {
     try {
@@ -413,13 +421,23 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         const sessionKey = resolveActiveSessionKey();
         if (!sessionKey) return;
 
+        // Cap stored messages per mode to keep PropertiesFile writes stable.
+        const cappedModeStates: any = {};
+        (['learn', 'create', 'pro'] as const).forEach((mode) => {
+          const st = modeStatesRef.current[mode];
+          cappedModeStates[mode] = {
+            ...st,
+            messages: trimMessages(st?.messages ?? []),
+          };
+        });
+
         const sessionPayload = {
           v: 1,
           ownerEmail: getActiveUserEmail(),
           selectedLearnLevel,
           completedSteps,
           hasCompletedAnalysis,
-          modeStates: modeStatesRef.current,
+          modeStates: cappedModeStates,
           savedAt: Date.now(),
         };
 
@@ -442,7 +460,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       } catch (e) {
         console.warn('[FunctionalChat] Failed to persist chat state:', e);
       }
-    }, 400);
+    }, 900);
     return () => window.clearTimeout(t);
   }, [selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 

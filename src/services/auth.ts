@@ -1,5 +1,7 @@
 import { safeGetItem, safeSetItem, safeRemoveItem, isLocalStorageAvailable } from '../utils/storage';
 
+const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -36,42 +38,48 @@ function parseUsers(): AuthUser[] {
 function persistUsers(users: AuthUser[]) {
   if (typeof window === 'undefined') return;
   
-  console.log('[Auth] 🔄 persistUsers called with', users.length, 'users');
+  if (IS_DEV) console.log('[Auth] 🔄 persistUsers called with', users.length, 'users');
   const usersJson = JSON.stringify(users);
-  console.log('[Auth] 📦 Users JSON length:', usersJson.length);
-  console.log('[Auth] 📦 Users JSON preview:', usersJson.substring(0, 200));
+  if (IS_DEV) {
+    console.log('[Auth] 📦 Users JSON length:', usersJson.length);
+    console.log('[Auth] 📦 Users JSON preview:', usersJson.substring(0, 200));
+  }
   
   // Debug: send message to JUCE to log this call
-  try {
-    if (typeof window !== 'undefined') {
-      const debugUrl = `juce://debug?message=persistUsers_called_with_${users.length}_users_json_length_${usersJson.length}`;
-      // Try top/parent first (for iframe), fallback to window
-      if (window.top && window.top !== window) {
-        window.top.location.href = debugUrl;
-      } else if (window.parent && window.parent !== window) {
-        window.parent.location.href = debugUrl;
-      } else if (window.location) {
-        window.location.href = debugUrl;
+  if (IS_DEV) {
+    try {
+      if (typeof window !== 'undefined') {
+        const debugUrl = `juce://debug?message=persistUsers_called_with_${users.length}_users_json_length_${usersJson.length}`;
+        // Try top/parent first (for iframe), fallback to window
+        if (window.top && window.top !== window) {
+          window.top.location.href = debugUrl;
+        } else if (window.parent && window.parent !== window) {
+          window.parent.location.href = debugUrl;
+        } else if (window.location) {
+          window.location.href = debugUrl;
+        }
       }
+    } catch (e) {
+      console.warn('[Auth] Failed to send debug message:', e);
     }
-  } catch (e) {
-    console.warn('[Auth] Failed to send debug message:', e);
   }
   
   // safeSetItem will handle JUCE fallback automatically
-  console.log('[Auth] 🔄 Calling safeSetItem for', USERS_KEY);
-  console.log('[Auth] 🔄 Checking if window.saveToJuce exists:', typeof (window as any).saveToJuce);
+  if (IS_DEV) {
+    console.log('[Auth] 🔄 Calling safeSetItem for', USERS_KEY);
+    console.log('[Auth] 🔄 Checking if window.saveToJuce exists:', typeof (window as any).saveToJuce);
+  }
   
   const success = safeSetItem(USERS_KEY, usersJson);
   if (!success) {
     console.warn('[Auth] ⚠️ Failed to persist users - localStorage blocked and JUCE not available');
   } else {
-    console.log('[Auth] ✅ persistUsers completed successfully');
+    if (IS_DEV) console.log('[Auth] ✅ persistUsers completed successfully');
     // Double-check: try to read it back immediately
     setTimeout(() => {
       const readBack = safeGetItem(USERS_KEY);
       if (readBack) {
-        console.log('[Auth] ✅ Verified: users data persisted successfully, length:', readBack.length);
+        if (IS_DEV) console.log('[Auth] ✅ Verified: users data persisted successfully, length:', readBack.length);
       } else {
         console.warn('[Auth] ⚠️ Warning: users data not found after save, length:', readBack?.length || 0);
       }
@@ -114,22 +122,24 @@ export function findUserByEmail(email: string): AuthUser | undefined {
 }
 
 export function saveUser(user: AuthUser): AuthUser {
-  console.log('[Auth] 🔄 saveUser called:', user.email);
+  if (IS_DEV) console.log('[Auth] 🔄 saveUser called:', user.email);
   
   // Debug: send message to JUCE immediately
-  try {
-    if (typeof window !== 'undefined') {
-      const debugUrl = `juce://debug?message=saveUser_called_with_email_${user.email}`;
-      if (window.top && window.top !== window) {
-        window.top.location.href = debugUrl;
-      } else if (window.parent && window.parent !== window) {
-        window.parent.location.href = debugUrl;
-      } else if (window.location) {
-        window.location.href = debugUrl;
+  if (IS_DEV) {
+    try {
+      if (typeof window !== 'undefined') {
+        const debugUrl = `juce://debug?message=saveUser_called_with_email_${user.email}`;
+        if (window.top && window.top !== window) {
+          window.top.location.href = debugUrl;
+        } else if (window.parent && window.parent !== window) {
+          window.parent.location.href = debugUrl;
+        } else if (window.location) {
+          window.location.href = debugUrl;
+        }
       }
+    } catch (e) {
+      console.warn('[Auth] Failed to send debug message from saveUser:', e);
     }
-  } catch (e) {
-    console.warn('[Auth] Failed to send debug message from saveUser:', e);
   }
   
   const users = parseUsers();
