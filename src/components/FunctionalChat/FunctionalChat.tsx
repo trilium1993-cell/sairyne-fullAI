@@ -279,6 +279,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
       const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
+      // If we have per-project sessions but no project selected yet, do not hydrate anything.
+      // This avoids accidentally showing the last opened project's chat for every project.
+      if (hasSessions && !sessionKey) {
+        return false;
+      }
+
       // v2 behavior: if we have sessions but none for this project, do NOT fall back to another project's state
       if (hasSessions && sessionKey && !session) {
         return false;

@@ -12,6 +12,7 @@ export default function ScreenManager() {
   const bootHandledRef = useRef(false);
   const authedSinceRef = useRef<number | null>(null);
   const forceProjectsRef = useRef(false);
+  const LAST_STEP_KEY = "sairyne_ui_last_step";
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -29,6 +30,13 @@ export default function ScreenManager() {
     if (runtimeBootId && runtimeBootId !== lastBootId) {
       // Persist for next opens within the same host process.
       safeSetItem("sairyne_last_boot_id", runtimeBootId);
+      return "ChooseYourProject";
+    }
+
+    // If the user last left the UI on the projects screen (within same host boot),
+    // respect that and keep them there on reopen.
+    const lastUiStep = safeGetItem(LAST_STEP_KEY);
+    if (lastUiStep === "ChooseYourProject") {
       return "ChooseYourProject";
     }
 
@@ -155,6 +163,15 @@ export default function ScreenManager() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Persist last visible screen so reopening the plugin window resumes the same UI (projects vs chat).
+  useEffect(() => {
+    try {
+      safeSetItem(LAST_STEP_KEY, currentStep);
+    } catch {
+      // best-effort
+    }
+  }, [currentStep]);
 
   const onNext = () => {
     const nextStep = NEXT[currentStep];

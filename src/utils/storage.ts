@@ -189,6 +189,15 @@ export function safeSetItem(key: string, value: string): boolean {
       console.warn('[Storage] ⚠️ localStorage.setItem failed:', error);
     }
   }
+
+  // Notify app/components immediately (used for reacting to selected project changes, etc.)
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent('sairyne-data-loaded', {
+        detail: { key, value }
+      }));
+    } catch {}
+  }
   
   // Data is in memory and sent to JUCE, so return true
   return true;
@@ -204,6 +213,16 @@ export function safeRemoveItem(key: string): boolean {
 
   try {
     window.localStorage.removeItem(key);
+    // Also remove from memory cache
+    memoryStorage.delete(key);
+    // Notify listeners that key was cleared
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('sairyne-data-loaded', {
+          detail: { key, value: '' }
+        }));
+      } catch {}
+    }
     return true;
   } catch (error) {
     return false;
