@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Window } from "../../components/Window";
+import { ClearChatConfirmation } from "../../components/ClearChatConfirmation";
 import {
   StoredProject,
   createProject,
@@ -10,6 +11,8 @@ import {
   clearSelectedProject,
   getSelectedProject,
 } from "../../services/projects";
+import { safeGetItem, safeSetItem } from "../../utils/storage";
+import { getActiveUserEmail } from "../../services/auth";
 
 interface YourProjectsProps {
   onNext: () => void;
@@ -25,7 +28,9 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   const [editingProject, setEditingProject] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [newlyCreatedProjectId, setNewlyCreatedProjectId] = useState<number | null>(null);
+  const [clearChatProject, setClearChatProject] = useState<StoredProject | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+  const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
 
   // Загружаем проекты из localStorage при монтировании компонента
   useEffect(() => {
@@ -130,6 +135,40 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
       setSelectedProjectState(null);
     }
     setContextMenu(null);
+  };
+
+  const handleClearChat = (projectId: number) => {
+    const project = projects.find(p => p.id === projectId) ?? null;
+    setContextMenu(null);
+    setClearChatProject(project);
+  };
+
+  const doClearChatForProject = (project: StoredProject) => {
+    try {
+      const raw = safeGetItem(CHAT_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      if (!parsed.sessions || typeof parsed.sessions !== 'object') return;
+
+      const sessions = parsed.sessions as Record<string, any>;
+      const activeEmail = getActiveUserEmail();
+
+      // Delete both possible keys just in case (legacy owner mapping vs active email)
+      const keysToDelete = new Set<string>([
+        `${activeEmail}:${project.id}`,
+        `${project.ownerEmail}:${project.id}`,
+      ]);
+
+      keysToDelete.forEach((k) => {
+        if (k in sessions) delete sessions[k];
+      });
+
+      parsed.sessions = sessions;
+      safeSetItem(CHAT_STATE_KEY, JSON.stringify(parsed));
+    } catch {
+      // best-effort
+    }
   };
 
   const handleSaveEdit = (projectId: number) => {
@@ -411,11 +450,42 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
                     </div>
                   </button>
                 </div>
+
+                {/* Clear Chat */}
+                <div className="h-8 relative self-stretch w-full">
+                  <button
+                    onClick={() => handleClearChat(contextMenu.projectId)}
+                    className="h-8 relative self-stretch w-full hover:bg-[#ff000008] rounded-md transition-colors cursor-pointer"
+                    role="menuitem"
+                    type="button"
+                  >
+                    <div className="absolute top-1.5 left-2 flex items-center gap-2">
+                      <div className="relative w-3.5 h-3.5">
+                        <svg className="w-3.5 h-3.5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div className="relative w-fit [font-family:'DM_Sans',Helvetica] font-normal text-red-400 text-[12px] tracking-[0px] leading-[16px] whitespace-nowrap">
+                        Clear chat
+                      </div>
+                    </div>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Clear chat confirmation */}
+      <ClearChatConfirmation
+        isVisible={Boolean(clearChatProject)}
+        projectName={clearChatProject?.name}
+        onClose={() => setClearChatProject(null)}
+        onConfirm={() => {
+          if (clearChatProject) doClearChatForProject(clearChatProject);
+        }}
+      />
     </>
   );
 };
