@@ -80,7 +80,7 @@ export default function ScreenManager() {
 
       // If user is on the "Your projects" screen, never auto-route away from it.
       // Navigation to chat must be explicit (project click / create+select).
-      if (currentStep === "ChooseYourProject") {
+      if (currentStep === "ChooseYourProject" && isAuthed) {
         return;
       }
 

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { openUrlInSystemBrowser } from "../../services/audio/juceBridge";
 import { resolveIsEmbedded } from "../../utils/embed";
+import { ResetDataConfirmation } from "../ResetDataConfirmation";
+import { resetAllLocalData } from "../../services/support";
 
 interface UserMenuProps {
   onClose?: () => void;
@@ -10,6 +12,7 @@ interface UserMenuProps {
 export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Element | null => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [showEULA, setShowEULA] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const handleLeaveFeedback = () => {
     const feedbackUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeUkIn9y-ZyWIjv03umKLl8x-NcD-JIoTDOneHPmHTciu6VpQ/viewform?usp=dialog";
@@ -47,6 +50,11 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
     if (onClose) {
       onClose();
     }
+  };
+
+  const handleResetLocalData = () => {
+    setShowResetConfirm(true);
+    if (onClose) onClose();
   };
 
   // Обработка клика вне окна
@@ -204,10 +212,31 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
               EULA
             </span>
           </button>
+
+          <div className="w-full h-px bg-[#ffffff14] my-1" />
+
+          <button
+            onClick={handleResetLocalData}
+            className="w-full text-left py-2.5 px-0 cursor-pointer hover:opacity-80 transition-opacity"
+            role="menuitem"
+            type="button"
+          >
+            <span className="[font-family:'DM_Sans',Helvetica] font-medium text-red-400 text-[14px] tracking-[0] leading-[21px] whitespace-nowrap">
+              Reset local data
+            </span>
+          </button>
         </div>
       </div>
     </div>
       )}
+
+      <ResetDataConfirmation
+        isVisible={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={() => {
+          resetAllLocalData();
+        }}
+      />
     </>
   );
 };

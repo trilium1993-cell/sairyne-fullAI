@@ -21,7 +21,8 @@ import { resolveIsEmbedded } from "../../utils/embed";
 import { AnalyticsService } from "../../services/analyticsService";
 import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
 import { getActiveUserEmail } from "../../services/auth";
-import { safeGetItem, safeSetItem } from "../../utils/storage";
+import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
+import { safeJsonParse } from "../../utils/safeJson";
 
 const SEND_ICON = "https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg";
 const ANALYSIS_ICON = "https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg";
@@ -279,7 +280,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
       if (!raw) return false;
-      const parsed = JSON.parse(raw);
+      // Guardrail: if chat state is corrupted/too large, reset only this key.
+      if (raw.length > 350_000) {
+        safeRemoveItem(CHAT_STATE_KEY);
+        return false;
+      }
+      const parsed = safeJsonParse<any>(raw, null);
       if (!parsed || typeof parsed !== 'object') return false;
 
       // v2+: per-project sessions
@@ -446,7 +452,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         try {
           const existing = safeGetItem(CHAT_STATE_KEY);
           if (existing) {
-            root = JSON.parse(existing);
+            root = safeJsonParse<any>(existing, {});
           }
         } catch {}
 
@@ -526,6 +532,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     }
 
     let isMounted = true;
+    let backoffMs = 4000;
+    let backoffTimer: number | null = null;
 
     const evaluateHealth = async () => {
       const healthy = await ChatService.checkHealth();
@@ -533,8 +541,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       if (healthy) {
         setIsOffline(false);
         setLastOnlineCheck(Date.now());
+        backoffMs = 4000;
       } else {
         setIsOffline(true);
+        // Backoff retries while offline to reduce load in plugin hosts
+        if (backoffTimer) window.clearTimeout(backoffTimer);
+        backoffTimer = window.setTimeout(() => {
+          if (isMounted) evaluateHealth();
+        }, backoffMs);
+        backoffMs = Math.min(backoffMs * 2, 60000);
       }
     };
 
@@ -554,6 +569,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       return () => {
         isMounted = false;
+        if (backoffTimer) window.clearTimeout(backoffTimer);
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
       };

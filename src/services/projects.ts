@@ -1,5 +1,6 @@
 import { getActiveUserEmail } from "./auth";
 import { safeGetItem, safeSetItem, safeRemoveItem, isLocalStorageAvailable } from '../utils/storage';
+import { safeJsonParse } from "../utils/safeJson";
 
 const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
 
@@ -22,8 +23,7 @@ function parseProjects(): StoredProject[] {
   
   try {
     const raw = safeGetItem(PROJECTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed = safeJsonParse<any>(raw, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((project) => {
       const ownerEmail = typeof project.ownerEmail === "string" && project.ownerEmail.length > 0

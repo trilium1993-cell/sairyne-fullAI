@@ -1,4 +1,5 @@
 import { safeGetItem, safeSetItem, safeRemoveItem, isLocalStorageAvailable } from '../utils/storage';
+import { safeJsonParse } from '../utils/safeJson';
 
 const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
 
@@ -20,8 +21,7 @@ function parseUsers(): AuthUser[] {
   
   try {
     const raw = safeGetItem(USERS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed = safeJsonParse<any>(raw, []);
     if (!Array.isArray(parsed)) return [];
     return parsed.map((user) => ({
       id: typeof user.id === 'number' ? user.id : Date.now(),
@@ -109,8 +109,8 @@ function readCurrentUser(): AuthUser | null {
 
   try {
     const raw = safeGetItem(CURRENT_USER_KEY);
-    if (!raw) return null;
-    return normalizeStoredUser(JSON.parse(raw));
+    const parsed = safeJsonParse<any>(raw, null);
+    return normalizeStoredUser(parsed);
   } catch (error) {
     console.warn('[Auth] Error reading current user:', error);
     return null;
