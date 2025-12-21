@@ -236,6 +236,30 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return `${ownerEmail}:${selected.id}`;
   };
 
+  const lastSessionKeyRef = useRef<string | null>(null);
+
+  const resetUiToBlankSession = useCallback(() => {
+    // Reset in-memory UI state so switching projects doesn't reuse previous project's chat
+    const emptyModeStates: Record<string, ModeState> = {
+      learn: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" },
+      create: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" },
+      pro: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: "" },
+    };
+    modeStatesRef.current = emptyModeStates as any;
+    previousModeRef.current = 'learn';
+    setSelectedLearnLevel('learn');
+    setMessages([]);
+    setCurrentStep(0);
+    setShowOptions(false);
+    setShowGenres(false);
+    setShowReadyButton(false);
+    setShowCompletedStep(false);
+    setCompletedStepText("");
+    setCompletedSteps(0);
+    setHasCompletedAnalysis(false);
+    isInitializedRef.current = false;
+  }, []);
+
   const sanitizeMessages = (msgs: Message[]): Message[] =>
     msgs.map((m) => ({
       ...m,
@@ -333,11 +357,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     // 1) Try hydrate chat state early
     tryHydrateFromStorage();
+    lastSessionKeyRef.current = resolveActiveSessionKey();
 
     // 2) If data arrives from JUCE later, re-hydrate once
     const onDataLoaded = (e: any) => {
       const key = e?.detail?.key;
       if (key === CHAT_STATE_KEY || key === 'sairyne_selected_project' || key === 'sairyne_projects') {
+        // If selected project changed, reset to blank BEFORE hydrating.
+        const nextSessionKey = resolveActiveSessionKey();
+        if (nextSessionKey && nextSessionKey !== lastSessionKeyRef.current) {
+          lastSessionKeyRef.current = nextSessionKey;
+          resetUiToBlankSession();
+        }
+
         tryHydrateFromStorage();
         // Also refresh project name when selected project data arrives late
         const selectedProject = getSelectedProject();

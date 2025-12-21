@@ -145,7 +145,17 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
     }
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = (projectId?: number) => {
+    // If user cancels immediately after creating a project via "+",
+    // treat it as "undo create" to avoid accidental empty projects.
+    if (typeof projectId === 'number' && newlyCreatedProjectId === projectId) {
+      const updated = removeProject(projectId);
+      setProjects(updated);
+      setFilteredProjects(updated);
+      if (selectedProjectState?.id === projectId) {
+        setSelectedProjectState(null);
+      }
+    }
     setEditingProject(null);
     setEditName("");
     setNewlyCreatedProjectId(null);
@@ -258,12 +268,12 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
                     >
                       {isEditing ? (
                         // Режим редактирования
-                        <div className="w-full h-full p-3 flex flex-col gap-2">
+                        <div className="w-full h-full p-2 flex flex-col gap-1">
                           <input
                             type="text"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            className="w-full px-2 py-1 bg-[#ffffff0d] border border-[#ffffff1c] rounded text-white text-sm outline-none focus:border-[#7322b6]"
+                            className="w-full h-7 px-2 bg-[#ffffff0d] border border-[#ffffff1c] rounded text-white text-[13px] outline-none focus:border-[#7322b6]"
                             autoFocus
                             onFocus={(e) => {
                               // Select default name so user can immediately rename
@@ -271,19 +281,19 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveEdit(project.id);
-                              if (e.key === 'Escape') handleCancelEdit();
+                              if (e.key === 'Escape') handleCancelEdit(project.id);
                             }}
                           />
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             <button
                               onClick={() => handleSaveEdit(project.id)}
-                              className="px-3 py-1 bg-[#7322b6] text-white text-xs rounded hover:bg-[#8a2db8] transition-colors"
+                              className="h-7 w-full bg-[#7322b6] text-white text-[12px] rounded hover:bg-[#8a2db8] transition-colors"
                             >
                               Save
                             </button>
                             <button
-                              onClick={handleCancelEdit}
-                              className="px-3 py-1 bg-[#ffffff1c] text-white text-xs rounded hover:bg-[#ffffff2c] transition-colors"
+                              onClick={() => handleCancelEdit(project.id)}
+                              className="h-7 w-full bg-[#ffffff1c] text-white text-[12px] rounded hover:bg-[#ffffff2c] transition-colors"
                             >
                               Cancel
                             </button>
