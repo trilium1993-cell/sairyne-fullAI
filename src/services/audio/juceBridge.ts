@@ -586,14 +586,13 @@ if (typeof window !== 'undefined') {
     if (pendingSaves.length > 0) {
       console.log('[JUCE Bridge] 📤 Processing pending saves:', pendingSaves.length);
       pendingSaves.forEach(({ key, value }) => {
-        if (tryEmitNativeEvent('saveData', { key, value })) {
-          return;
-        }
+        // IMPORTANT: In AU/WKWebView the app runs inside a sandboxed iframe.
+        // Direct juce:// navigation is often blocked, and window.__JUCE__ may not exist in the iframe.
+        // The robust path is: postMessage -> wrapper -> __JUCE__.backend.emitEvent('saveData').
         try {
-          const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
-          navigateToJuceScheme(juceUrl);
+          saveDataToJuce(key, value);
         } catch (e) {
-          console.warn('[JUCE Bridge] ⚠️ Failed to process pending save via juce scheme:', key, e);
+          console.warn('[JUCE Bridge] ⚠️ Failed to process pending save:', key, e);
         }
       });
     }
@@ -603,12 +602,8 @@ if (typeof window !== 'undefined') {
     if (pendingLoads.length > 0) {
       console.log('[JUCE Bridge] 📤 Processing pending loads:', pendingLoads.length);
       pendingLoads.forEach((key) => {
-        if (tryEmitNativeEvent('loadData', { key })) {
-          return;
-        }
         try {
-          const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
-          navigateToJuceScheme(juceUrl);
+          loadDataFromJuce(key);
         } catch (e) {
           console.warn('[JUCE Bridge] ⚠️ Failed to process pending load:', key, e);
         }
