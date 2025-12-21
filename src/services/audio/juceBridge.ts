@@ -373,12 +373,13 @@ export function openUrlInSystemBrowser(url: string): void {
     console.warn('[JUCE Bridge] ⚠️ window.open failed:', e);
   }
 
-  // Method 2: Send OPEN_URL via postMessage (preferred in embedded plugin wrappers)
+  // Method 2: Send OPEN_URL via postMessage (preferred in embedded plugin wrappers / sandboxed iframes)
   try {
     console.log('[JUCE Bridge] 📤 Method 2: Trying postMessage OPEN_URL');
     sendToJuceViaPostMessage(JuceMessageType.OPEN_URL, { url });
     // If wrapper/JUCE is listening, this is enough.
     // Do not early-return if not embedded (sendToJuceViaPostMessage will log when no parent exists).
+    return;
   } catch (e) {
     console.warn('[JUCE Bridge] ⚠️ postMessage OPEN_URL failed:', e);
   }
@@ -440,21 +441,20 @@ export function saveDataToJuce(key: string, value: string): void {
   if (tryEmitNativeEvent('saveData', { key, value })) {
     return;
   }
-  
-  // Preferred: JUCE scheme (most reliable for AU/VST3 WebView integrations)
-  // C++ side typically intercepts: juce://save?key=...&value=...
-  try {
-    const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
-    console.log('[JUCE Bridge] 📤 Using juce scheme save:', juceUrl.substring(0, 200));
-    navigateToJuceScheme(juceUrl);
-    return;
-  } catch (e) {
-    console.warn('[JUCE Bridge] ⚠️ juce://save failed, falling back to postMessage:', e);
-  }
 
-  // Fallback: postMessage (for wrappers that translate messages to schemes)
-  console.log('[JUCE Bridge] 📤 Fallback: sendToJuceViaPostMessage(save_data)');
+  // Preferred in sandboxed iframe: postMessage to wrapper, which then performs juce://save
+  console.log('[JUCE Bridge] 📤 Preferred: postMessage save_data to wrapper');
   sendToJuceViaPostMessage(JuceMessageType.SAVE_DATA, { key, value });
+  return;
+
+  // Last resort: JUCE scheme (works when NOT inside a sandboxed iframe)
+  // try {
+  //   const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
+  //   console.log('[JUCE Bridge] 📤 Last resort: juce scheme save:', juceUrl.substring(0, 200));
+  //   navigateToJuceScheme(juceUrl);
+  // } catch (e) {
+  //   console.warn('[JUCE Bridge] ⚠️ juce://save failed:', e);
+  // }
 }
 
 /**
@@ -476,20 +476,20 @@ export function loadDataFromJuce(key: string): void {
   if (tryEmitNativeEvent('loadData', { key })) {
     return;
   }
-  
-  // Preferred: JUCE scheme (C++ intercepts: juce://load?key=...)
-  try {
-    const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
-    console.log('[JUCE Bridge] 📤 Using juce scheme load:', juceUrl);
-    navigateToJuceScheme(juceUrl);
-    return;
-  } catch (e) {
-    console.warn('[JUCE Bridge] ⚠️ juce://load failed, falling back to postMessage:', e);
-  }
 
-  // Fallback: postMessage
-  console.log('[JUCE Bridge] 📤 Fallback: sendToJuceViaPostMessage(load_data)');
+  // Preferred in sandboxed iframe: postMessage to wrapper, which then performs juce://load
+  console.log('[JUCE Bridge] 📤 Preferred: postMessage load_data to wrapper');
   sendToJuceViaPostMessage(JuceMessageType.LOAD_DATA, { key });
+  return;
+
+  // Last resort: JUCE scheme (works when NOT inside a sandboxed iframe)
+  // try {
+  //   const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
+  //   console.log('[JUCE Bridge] 📤 Last resort: juce scheme load:', juceUrl);
+  //   navigateToJuceScheme(juceUrl);
+  // } catch (e) {
+  //   console.warn('[JUCE Bridge] ⚠️ juce://load failed:', e);
+  // }
 }
 
 /**
