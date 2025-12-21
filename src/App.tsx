@@ -86,7 +86,10 @@ function App() {
       // Also save to localStorage as cache
       if (typeof window !== 'undefined' && window.localStorage) {
         try {
-          window.localStorage.setItem(payload.key, payload.value);
+          // IMPORTANT: runtime boot id must be runtime-only, never cached across host restarts.
+          if (payload.key !== 'sairyne_runtime_boot_id') {
+            window.localStorage.setItem(payload.key, payload.value);
+          }
           console.log('[App] Saved to localStorage cache:', payload.key);
         } catch (e) {
           console.warn('[App] Failed to save to localStorage:', e);

@@ -29,13 +29,21 @@ function syncFromWindowStorage() {
   if (typeof window !== 'undefined' && (window as any).__sairyneStorage) {
     const windowStorage = (window as any).__sairyneStorage as Map<string, string>;
     windowStorage.forEach((value, key) => {
-      if (!memoryStorage.has(key)) {
+      // JUCE-injected data is the source of truth. If the injected value differs,
+      // overwrite any cached memory value (important for runtime boot id).
+      const existing = memoryStorage.get(key);
+      if (existing !== value) {
         memoryStorage.set(key, value);
-        console.log('[Storage] 🔄 Synced from __sairyneStorage:', key);
+        console.log('[Storage] 🔄 Synced from __sairyneStorage (overwrite):', key);
       }
     });
   }
 }
+
+// Keys that must never be served from localStorage cache (runtime-only / host-provided)
+const NO_LOCALSTORAGE_KEYS = new Set<string>([
+  'sairyne_runtime_boot_id',
+]);
 
 /**
  * Check if localStorage is available and working
@@ -79,7 +87,7 @@ export function safeGetItem(key: string): string | null {
   }
 
   // Then try localStorage (as cache)
-  if (isLocalStorageAvailable()) {
+  if (!NO_LOCALSTORAGE_KEYS.has(key) && isLocalStorageAvailable()) {
     try {
       const value = window.localStorage.getItem(key);
       if (value !== null) {

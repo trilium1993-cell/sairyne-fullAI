@@ -574,6 +574,8 @@ if (typeof window !== 'undefined') {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
         Object.entries(data).forEach(([key, value]) => {
+          // IMPORTANT: runtime boot id must be runtime-only, never cached across host restarts.
+          if (key === 'sairyne_runtime_boot_id') return;
           window.localStorage.setItem(key, value);
         });
         console.log('[JUCE Bridge] ✅ Saved', Object.keys(data).length, 'keys to localStorage cache');

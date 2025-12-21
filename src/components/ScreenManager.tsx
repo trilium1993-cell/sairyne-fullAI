@@ -10,6 +10,7 @@ export default function ScreenManager() {
   const lastAutoStepRef = useRef<Step | null>(null);
   const manualStayOnProjectsRef = useRef(false);
   const bootHandledRef = useRef(false);
+  const firstBootstrapAtRef = useRef<number | null>(null);
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -51,11 +52,26 @@ export default function ScreenManager() {
 
   const tryAutoBootstrap = () => {
     try {
+      if (firstBootstrapAtRef.current === null) {
+        firstBootstrapAtRef.current = Date.now();
+      }
+
       // Prevent repeated boot-id writes / flip-flopping.
       // Once we have handled a "new host boot" decision, we can continue normal logic.
       if (!bootHandledRef.current) {
         const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
         const lastBootId = safeGetItem("sairyne_last_boot_id");
+
+        // If we're authenticated but runtime boot id hasn't arrived yet, wait briefly
+        // so we don't accidentally auto-resume chat using stale cached values.
+        const token = safeGetItem("sairyne_access_token");
+        const currentUser = safeGetItem("sairyne_current_user");
+        const isAuthed = Boolean(token && currentUser);
+        const waitedMs = Date.now() - (firstBootstrapAtRef.current || Date.now());
+        if (isAuthed && !runtimeBootId && waitedMs < 2000) {
+          return;
+        }
+
         if (runtimeBootId && runtimeBootId !== lastBootId) {
           bootHandledRef.current = true;
           manualStayOnProjectsRef.current = true;
