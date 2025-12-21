@@ -11,6 +11,7 @@ export default function ScreenManager() {
   const manualStayOnProjectsRef = useRef(false);
   const bootHandledRef = useRef(false);
   const authedSinceRef = useRef<number | null>(null);
+  const forceProjectsRef = useRef(false);
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -63,6 +64,12 @@ export default function ScreenManager() {
         authedSinceRef.current = null;
       }
 
+      // Hard lock: if we decided "stay on projects" (e.g. after host restart),
+      // never auto-jump into chat until the user explicitly selects a project (onNext).
+      if (forceProjectsRef.current) {
+        return;
+      }
+
       // Prevent repeated boot-id writes / flip-flopping.
       // Once we have handled a "new host boot" decision, we can continue normal logic.
       if (!bootHandledRef.current) {
@@ -75,6 +82,7 @@ export default function ScreenManager() {
           const waitedMs = Date.now() - (authedSinceRef.current || Date.now());
           if (waitedMs < 2500) return;
           // If boot id still didn't arrive, default to Projects (safe choice).
+          forceProjectsRef.current = true;
           manualStayOnProjectsRef.current = true;
           setHistory([]);
           setCurrentStep("ChooseYourProject");
@@ -84,6 +92,7 @@ export default function ScreenManager() {
 
         if (runtimeBootId && runtimeBootId !== lastBootId) {
           bootHandledRef.current = true;
+          forceProjectsRef.current = true;
           manualStayOnProjectsRef.current = true;
           setHistory([]);
           setCurrentStep("ChooseYourProject");
@@ -145,6 +154,8 @@ export default function ScreenManager() {
     const nextStep = NEXT[currentStep];
     if (nextStep) {
       if (currentStep === "ChooseYourProject") {
+        // User explicitly picked a project (or created one) -> allow auto-flow again.
+        forceProjectsRef.current = false;
         manualStayOnProjectsRef.current = false;
       }
       setHistory(prev => [...prev, currentStep]);
