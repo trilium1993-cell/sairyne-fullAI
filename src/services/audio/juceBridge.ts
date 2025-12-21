@@ -187,7 +187,9 @@ function sendToJuceViaPostMessage(type: string | JuceMessageType, payload: any):
     console.log('[JUCE Bridge] 🔍 window.top exists?', window.top !== undefined);
     console.log('[JUCE Bridge] 🔍 window.top !== window?', window.top !== window);
     
-    // Send to parent (wrapper) via postMessage
+    // Send to parent (wrapper) via postMessage when embedded in an iframe,
+    // otherwise send to self. Many plugin hosts load the app directly (no iframe),
+    // but still inject a message handler into the same window.
     if (window.parent && window.parent !== window) {
       console.log('[JUCE Bridge] 📤 Attempting to send postMessage to window.parent...');
       window.parent.postMessage(message, '*');
@@ -199,11 +201,9 @@ function sendToJuceViaPostMessage(type: string | JuceMessageType, payload: any):
       console.log('[JUCE Bridge] ✅ postMessage sent to window.top');
       console.log('[JUCE Bridge] ✅ Message should be received by wrapper script');
     } else {
-      console.error('[JUCE Bridge] ❌ No parent window found for postMessage!');
-      console.error('[JUCE Bridge] ❌ window.parent:', window.parent);
-      console.error('[JUCE Bridge] ❌ window.top:', window.top);
-      console.error('[JUCE Bridge] ❌ window:', window);
-      console.error('[JUCE Bridge] ❌ This means we are not in an iframe!');
+      console.log('[JUCE Bridge] 📤 No parent/top iframe found; sending postMessage to self (window)...');
+      window.postMessage(message, '*');
+      console.log('[JUCE Bridge] ✅ postMessage sent to window (self)');
     }
   } catch (error) {
     console.error('[JUCE Bridge] ❌ Failed to send postMessage:', error);
