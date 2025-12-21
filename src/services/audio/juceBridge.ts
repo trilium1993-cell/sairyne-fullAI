@@ -212,6 +212,24 @@ function sendToJuceViaPostMessage(type: string | JuceMessageType, payload: any):
   }
 }
 
+/**
+ * Navigate to a JUCE custom-scheme URL so the host can intercept it (pageAboutToLoad/newWindowAttemptingToLoad).
+ * Works even when not embedded in an iframe.
+ */
+function navigateToJuceScheme(url: string): void {
+  try {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+    } else if (window.parent && window.parent !== window) {
+      window.parent.location.href = url;
+    } else if (window.location) {
+      window.location.href = url;
+    }
+  } catch (e) {
+    console.warn('[JUCE Bridge] ⚠️ navigateToJuceScheme failed:', e);
+  }
+}
+
 // ============================================
 // BRIDGE IMPLEMENTATION
 // ============================================
@@ -374,11 +392,20 @@ export function saveDataToJuce(key: string, value: string): void {
     return;
   }
   
-  // Bridge is ready, send immediately
-  console.log('[JUCE Bridge] ✅ Bridge ready, sending save_data immediately');
-  console.log('[JUCE Bridge] 📤 About to call sendToJuceViaPostMessage...');
-  sendToJuceViaPostMessage('save_data', { key, value });
-  console.log('[JUCE Bridge] ✅ sendToJuceViaPostMessage completed');
+  // Preferred: JUCE scheme (most reliable for AU/VST3 WebView integrations)
+  // C++ side typically intercepts: juce://save?key=...&value=...
+  try {
+    const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
+    console.log('[JUCE Bridge] 📤 Using juce scheme save:', juceUrl.substring(0, 200));
+    navigateToJuceScheme(juceUrl);
+    return;
+  } catch (e) {
+    console.warn('[JUCE Bridge] ⚠️ juce://save failed, falling back to postMessage:', e);
+  }
+
+  // Fallback: postMessage (for wrappers that translate messages to schemes)
+  console.log('[JUCE Bridge] 📤 Fallback: sendToJuceViaPostMessage(save_data)');
+  sendToJuceViaPostMessage(JuceMessageType.SAVE_DATA, { key, value });
 }
 
 /**
@@ -395,9 +422,19 @@ export function loadDataFromJuce(key: string): void {
     return;
   }
   
-  // Bridge is ready, send load request
-  console.log('[JUCE Bridge] ✅ Bridge ready, sending load_data request');
-  sendToJuceViaPostMessage('load_data', { key });
+  // Preferred: JUCE scheme (C++ intercepts: juce://load?key=...)
+  try {
+    const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
+    console.log('[JUCE Bridge] 📤 Using juce scheme load:', juceUrl);
+    navigateToJuceScheme(juceUrl);
+    return;
+  } catch (e) {
+    console.warn('[JUCE Bridge] ⚠️ juce://load failed, falling back to postMessage:', e);
+  }
+
+  // Fallback: postMessage
+  console.log('[JUCE Bridge] 📤 Fallback: sendToJuceViaPostMessage(load_data)');
+  sendToJuceViaPostMessage(JuceMessageType.LOAD_DATA, { key });
 }
 
 /**
