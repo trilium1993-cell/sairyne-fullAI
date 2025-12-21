@@ -315,6 +315,25 @@ class JuceBridge {
 
 const bridge = new JuceBridge();
 
+/**
+ * Preferred path for plugin WebViews: call JUCE native event listeners directly.
+ * This works even inside sandboxed iframes, where top-level navigation to custom schemes is blocked.
+ */
+function tryEmitNativeEvent(eventName: string, payload: any): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const backend = (window as any).__JUCE__?.backend;
+    if (backend && typeof backend.emitEvent === 'function') {
+      backend.emitEvent(eventName, payload);
+      console.log('[JUCE Bridge] ✅ emitEvent sent:', eventName);
+      return true;
+    }
+  } catch (e) {
+    console.warn('[JUCE Bridge] ⚠️ emitEvent failed:', eventName, e);
+  }
+  return false;
+}
+
 // ============================================
 // EXPORTED FUNCTIONS
 // ============================================
@@ -324,6 +343,11 @@ const bridge = new JuceBridge();
  */
 export function openUrlInSystemBrowser(url: string): void {
   console.log('[JUCE Bridge] 🔄 openUrlInSystemBrowser called:', url);
+
+  // Method 0 (preferred in plugin iframe): emit native event for JUCE to handle
+  if (tryEmitNativeEvent('openUrl', { url })) {
+    return;
+  }
   
   // Try multiple methods to ensure it works across hosts.
   // AU on macOS often uses WKWebView, which can silently block `window.open` and/or custom navigations.
@@ -411,6 +435,11 @@ export function saveDataToJuce(key: string, value: string): void {
     setPendingSave(key, value);
     return;
   }
+
+  // Preferred in plugin iframe: JUCE native event listener
+  if (tryEmitNativeEvent('saveData', { key, value })) {
+    return;
+  }
   
   // Preferred: JUCE scheme (most reliable for AU/VST3 WebView integrations)
   // C++ side typically intercepts: juce://save?key=...&value=...
@@ -440,6 +469,11 @@ export function loadDataFromJuce(key: string): void {
   if (!isJuceReady()) {
     console.warn('[JUCE Bridge] ⚠️ Bridge not ready, queueing load request');
     setPendingLoad(key);
+    return;
+  }
+
+  // Preferred in plugin iframe: JUCE native event listener
+  if (tryEmitNativeEvent('loadData', { key })) {
     return;
   }
   
@@ -552,6 +586,9 @@ if (typeof window !== 'undefined') {
     if (pendingSaves.length > 0) {
       console.log('[JUCE Bridge] 📤 Processing pending saves:', pendingSaves.length);
       pendingSaves.forEach(({ key, value }) => {
+        if (tryEmitNativeEvent('saveData', { key, value })) {
+          return;
+        }
         try {
           const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
           navigateToJuceScheme(juceUrl);
@@ -566,6 +603,9 @@ if (typeof window !== 'undefined') {
     if (pendingLoads.length > 0) {
       console.log('[JUCE Bridge] 📤 Processing pending loads:', pendingLoads.length);
       pendingLoads.forEach((key) => {
+        if (tryEmitNativeEvent('loadData', { key })) {
+          return;
+        }
         try {
           const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
           navigateToJuceScheme(juceUrl);
