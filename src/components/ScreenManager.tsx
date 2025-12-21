@@ -10,7 +10,7 @@ export default function ScreenManager() {
   const lastAutoStepRef = useRef<Step | null>(null);
   const manualStayOnProjectsRef = useRef(false);
   const bootHandledRef = useRef(false);
-  const firstBootstrapAtRef = useRef<number | null>(null);
+  const authedSinceRef = useRef<number | null>(null);
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -52,8 +52,15 @@ export default function ScreenManager() {
 
   const tryAutoBootstrap = () => {
     try {
-      if (firstBootstrapAtRef.current === null) {
-        firstBootstrapAtRef.current = Date.now();
+      // Determine auth status (sync reads; values may arrive async via JUCE events)
+      const token = safeGetItem("sairyne_access_token");
+      const currentUser = safeGetItem("sairyne_current_user");
+      const isAuthed = Boolean(token && currentUser);
+
+      if (isAuthed) {
+        if (authedSinceRef.current === null) authedSinceRef.current = Date.now();
+      } else {
+        authedSinceRef.current = null;
       }
 
       // Prevent repeated boot-id writes / flip-flopping.
@@ -63,12 +70,15 @@ export default function ScreenManager() {
         const lastBootId = safeGetItem("sairyne_last_boot_id");
 
         // If we're authenticated but runtime boot id hasn't arrived yet, wait briefly
-        // so we don't accidentally auto-resume chat using stale cached values.
-        const token = safeGetItem("sairyne_access_token");
-        const currentUser = safeGetItem("sairyne_current_user");
-        const isAuthed = Boolean(token && currentUser);
-        const waitedMs = Date.now() - (firstBootstrapAtRef.current || Date.now());
-        if (isAuthed && !runtimeBootId && waitedMs < 2000) {
+        // so we don't accidentally auto-resume chat before the host-boot decision is known.
+        if (isAuthed && !runtimeBootId) {
+          const waitedMs = Date.now() - (authedSinceRef.current || Date.now());
+          if (waitedMs < 2500) return;
+          // If boot id still didn't arrive, default to Projects (safe choice).
+          manualStayOnProjectsRef.current = true;
+          setHistory([]);
+          setCurrentStep("ChooseYourProject");
+          bootHandledRef.current = true;
           return;
         }
 
