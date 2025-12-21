@@ -19,6 +19,25 @@ function App() {
     };
   }, []);
 
+  // Prevent Backspace from navigating WebView history (can blank the plugin UI) when not typing in an input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Backspace") return;
+      const target = e.target as HTMLElement | null;
+      const tag = (target?.tagName || "").toLowerCase();
+      const isEditable =
+        tag === "input" ||
+        tag === "textarea" ||
+        Boolean((target as any)?.isContentEditable);
+      if (!isEditable) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, []);
+
   // Subscribe to data loaded events (data will be injected by C++ via onJuceInit or onJuceDataLoaded)
   useEffect(() => {
     // Listen for postMessage from wrapper (for juce_init and juce_data_loaded)

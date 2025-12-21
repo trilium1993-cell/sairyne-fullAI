@@ -317,8 +317,12 @@ export const Frame = ({ projectName = "New project", totalSteps = 7, completedSt
               />
             </div>
             <span
-              className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] max-w-[140px] truncate"
+              className="font-body font-[number:var(--body-font-weight)] text-white text-[length:var(--body-font-size)] text-center tracking-[var(--body-letter-spacing)] leading-[var(--body-line-height)] [font-style:var(--body-font-style)] max-w-[140px] truncate select-none cursor-default"
               title={projectName}
+              onMouseDown={(e) => {
+                // Prevent text-caret/selection focus in WebView (Backspace can navigate back and blank the view).
+                e.preventDefault();
+              }}
             >
               {projectName}
             </span>
