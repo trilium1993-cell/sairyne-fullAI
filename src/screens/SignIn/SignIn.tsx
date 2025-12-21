@@ -183,22 +183,14 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
   const handleForgotPassword = () => {
     const url = 'https://www.sairyne.net/reset-password';
-    const isEmbedded = resolveIsEmbedded();
-    if (isEmbedded) {
-      openUrlInSystemBrowser(url);
-    } else if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-    }
+    // Always go through the JUCE bridge helper; AU (WKWebView) can block direct window.open.
+    openUrlInSystemBrowser(url);
   };
 
   const handleSignUp = () => {
     const url = 'https://www.sairyne.net/register';
-    const isEmbedded = resolveIsEmbedded();
-    if (isEmbedded) {
-      openUrlInSystemBrowser(url);
-    } else if (typeof window !== 'undefined') {
-      window.open(url, '_blank');
-    }
+    // Always go through the JUCE bridge helper; AU (WKWebView) can block direct window.open.
+    openUrlInSystemBrowser(url);
   };
 
   const closeError = () => {

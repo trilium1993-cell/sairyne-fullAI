@@ -13,17 +13,8 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
 
   const handleLeaveFeedback = () => {
     const feedbackUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeUkIn9y-ZyWIjv03umKLl8x-NcD-JIoTDOneHPmHTciu6VpQ/viewform?usp=dialog";
-    const isEmbedded = resolveIsEmbedded();
-    
-    console.log('[UserMenu] Leave feedback clicked, isEmbedded:', isEmbedded);
-    
-    if (isEmbedded) {
-      openUrlInSystemBrowser(feedbackUrl);
-    } else {
-      if (typeof window !== 'undefined') {
-        window.open(feedbackUrl, '_blank');
-      }
-    }
+    // Always use bridge helper; AU (WKWebView) can block direct window.open.
+    openUrlInSystemBrowser(feedbackUrl);
     
     if (onClose) {
       onClose();
@@ -32,17 +23,8 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
 
   const handleReportBug = () => {
     const bugUrl = "https://docs.google.com/forms/d/e/1FAIpQLSebyIZvChtL_nXqKKedIufgs9tLT-fEnMGm43-48HGBKO36Zg/viewform?usp=dialog";
-    const isEmbedded = resolveIsEmbedded();
-    
-    console.log('[UserMenu] Report bug clicked, isEmbedded:', isEmbedded);
-    
-    if (isEmbedded) {
-      openUrlInSystemBrowser(bugUrl);
-    } else {
-      if (typeof window !== 'undefined') {
-        window.open(bugUrl, '_blank');
-      }
-    }
+    // Always use bridge helper; AU (WKWebView) can block direct window.open.
+    openUrlInSystemBrowser(bugUrl);
     
     if (onClose) {
       onClose();
@@ -59,17 +41,8 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
 
   const handleOpenWebsite = () => {
     const websiteUrl = 'https://www.sairyne.net';
-    const isEmbedded = resolveIsEmbedded();
-    
-    console.log('[UserMenu] Sairyne Website clicked, isEmbedded:', isEmbedded);
-    
-    if (isEmbedded) {
-      openUrlInSystemBrowser(websiteUrl);
-    } else {
-      if (typeof window !== 'undefined') {
-        window.open(websiteUrl, '_blank');
-      }
-    }
+    // Always use bridge helper; AU (WKWebView) can block direct window.open.
+    openUrlInSystemBrowser(websiteUrl);
     
     if (onClose) {
       onClose();

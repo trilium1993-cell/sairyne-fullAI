@@ -285,23 +285,44 @@ const bridge = new JuceBridge();
 export function openUrlInSystemBrowser(url: string): void {
   console.log('[JUCE Bridge] 🔄 openUrlInSystemBrowser called:', url);
   
-  // Try multiple methods to ensure it works
-  // Method 1: Use window.open (this triggers newWindowAttemptingToLoad in JUCE)
+  // Try multiple methods to ensure it works across hosts.
+  // AU on macOS often uses WKWebView, which can silently block `window.open` and/or custom navigations.
+  // So we only treat `window.open` as success if it returns a Window reference.
+  //
+  // Order:
+  // 1) window.open (success if non-null)
+  // 2) postMessage to wrapper/JUCE (OPEN_URL)
+  // 3) custom scheme navigation (juce:// then sairyne://) as a last resort
+
+  // Method 1: Use window.open (may return null if blocked)
   try {
     console.log('[JUCE Bridge] 📤 Method 1: Trying window.open');
     if (typeof window !== 'undefined' && window.open) {
-      window.open(url, '_blank');
-      console.log('[JUCE Bridge] ✅ window.open called');
-      return; // If this works, we're done
+      const opened = window.open(url, '_blank');
+      if (opened) {
+        console.log('[JUCE Bridge] ✅ window.open succeeded');
+        return;
+      }
+      console.warn('[JUCE Bridge] ⚠️ window.open was blocked (returned null), falling back…');
     }
   } catch (e) {
     console.warn('[JUCE Bridge] ⚠️ window.open failed:', e);
   }
+
+  // Method 2: Send OPEN_URL via postMessage (preferred in embedded plugin wrappers)
+  try {
+    console.log('[JUCE Bridge] 📤 Method 2: Trying postMessage OPEN_URL');
+    sendToJuceViaPostMessage(JuceMessageType.OPEN_URL, { url });
+    // If wrapper/JUCE is listening, this is enough.
+    // Do not early-return if not embedded (sendToJuceViaPostMessage will log when no parent exists).
+  } catch (e) {
+    console.warn('[JUCE Bridge] ⚠️ postMessage OPEN_URL failed:', e);
+  }
   
-  // Method 2: Use juce:// scheme via location.href
+  // Method 3: Use juce:// scheme via location.href
   try {
     const juceUrl = `juce://open_url?url=${encodeURIComponent(url)}`;
-    console.log('[JUCE Bridge] 📤 Method 2: Setting location.href to:', juceUrl);
+    console.log('[JUCE Bridge] 📤 Method 3: Setting location.href to:', juceUrl);
     
     if (window.top && window.top !== window) {
       window.top.location.href = juceUrl;
@@ -315,10 +336,10 @@ export function openUrlInSystemBrowser(url: string): void {
     console.error('[JUCE Bridge] ❌ location.href failed:', e);
   }
   
-  // Method 3: Fallback to sairyne:// scheme (if juce:// doesn't work)
+  // Method 4: Fallback to sairyne:// scheme (if juce:// doesn't work)
   try {
     const sairyneUrl = `sairyne://open_url?url=${encodeURIComponent(url)}`;
-    console.log('[JUCE Bridge] 📤 Method 3: Fallback to sairyne:// scheme');
+    console.log('[JUCE Bridge] 📤 Method 4: Fallback to sairyne:// scheme');
     
     if (window.top && window.top !== window) {
       window.top.location.href = sairyneUrl;
