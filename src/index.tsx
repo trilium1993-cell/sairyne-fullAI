@@ -36,6 +36,19 @@ function installLocalStorageMirrorToJuce() {
 
 installLocalStorageMirrorToJuce();
 
+// Debug ping: prove whether iframe -> wrapper postMessage works in AU/WKWebView.
+// Wrapper is instrumented to log any JUCE_DATA via juce://debug in Sairyne.log.
+try {
+  if (typeof window !== "undefined" && window.parent && window.parent !== window) {
+    window.parent.postMessage(
+      { type: "JUCE_DATA", command: "debug_ping", payload: { key: "debug_ping", value: "ping" } },
+      "*"
+    );
+  }
+} catch {
+  // ignore
+}
+
 createRoot(document.getElementById("app") as HTMLElement).render(
   <App />
 );
