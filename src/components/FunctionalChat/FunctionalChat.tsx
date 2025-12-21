@@ -228,6 +228,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const previousModeRef = useRef<string>(selectedLearnLevel);
 
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
+  const resolveActiveSessionKey = () => {
+    const ownerEmail = getActiveUserEmail();
+    const selected = getSelectedProject();
+    // If no project selected yet, do NOT reuse any previous chat session.
+    if (!selected || typeof selected.id !== 'number') return null;
+    return `${ownerEmail}:${selected.id}`;
+  };
 
   const sanitizeMessages = (msgs: Message[]): Message[] =>
     msgs.map((m) => ({
@@ -243,19 +250,32 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== 'object') return false;
 
-      if (typeof parsed.selectedLearnLevel === 'string') {
-        setSelectedLearnLevel(parsed.selectedLearnLevel);
-        previousModeRef.current = parsed.selectedLearnLevel;
+      // v2+: per-project sessions
+      const sessionKey = resolveActiveSessionKey();
+      const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
+      const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
+
+      // v2 behavior: if we have sessions but none for this project, do NOT fall back to another project's state
+      if (hasSessions && sessionKey && !session) {
+        return false;
       }
 
-      if (typeof parsed.completedSteps === 'number') setCompletedSteps(parsed.completedSteps);
-      if (typeof parsed.hasCompletedAnalysis === 'boolean') setHasCompletedAnalysis(parsed.hasCompletedAnalysis);
+      // Backward-compat: old format (no sessions) treated as current session (will be migrated on next save)
+      const effective = session && typeof session === 'object' ? session : parsed;
+
+      if (typeof effective.selectedLearnLevel === 'string') {
+        setSelectedLearnLevel(effective.selectedLearnLevel);
+        previousModeRef.current = effective.selectedLearnLevel;
+      }
+
+      if (typeof effective.completedSteps === 'number') setCompletedSteps(effective.completedSteps);
+      if (typeof effective.hasCompletedAnalysis === 'boolean') setHasCompletedAnalysis(effective.hasCompletedAnalysis);
 
       // Restore mode states
-      if (parsed.modeStates && typeof parsed.modeStates === 'object') {
+      if (effective.modeStates && typeof effective.modeStates === 'object') {
         const restored: any = {};
         ['learn', 'create', 'pro'].forEach((mode) => {
-          const st = parsed.modeStates[mode];
+          const st = effective.modeStates[mode];
           if (st && typeof st === 'object') {
             restored[mode] = {
               messages: Array.isArray(st.messages) ? sanitizeMessages(st.messages) : [],
@@ -352,7 +372,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
-        const payload = {
+        const sessionKey = resolveActiveSessionKey();
+        if (!sessionKey) return;
+
+        const sessionPayload = {
           v: 1,
           ownerEmail: getActiveUserEmail(),
           selectedLearnLevel,
@@ -361,7 +384,23 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           modeStates: modeStatesRef.current,
           savedAt: Date.now(),
         };
-        safeSetItem(CHAT_STATE_KEY, JSON.stringify(payload));
+
+        // Store per-project session inside a single persisted key (so C++ inject can stay simple)
+        let root: any = {};
+        try {
+          const existing = safeGetItem(CHAT_STATE_KEY);
+          if (existing) {
+            root = JSON.parse(existing);
+          }
+        } catch {}
+
+        if (!root || typeof root !== 'object') root = {};
+        if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
+        root.v = 2;
+        root.sessions[sessionKey] = sessionPayload;
+        root.savedAt = Date.now();
+
+        safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
       } catch (e) {
         console.warn('[FunctionalChat] Failed to persist chat state:', e);
       }

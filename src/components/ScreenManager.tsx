@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Step, NEXT } from "../flow/steps";
 import { getScreenComponent } from "../flow/registry";
-import { safeGetItem } from "../utils/storage";
+import { safeGetItem, safeSetItem } from "../utils/storage";
 import { getLatestProject, getSelectedProject, setSelectedProject } from "../services/projects";
 
 export default function ScreenManager() {
@@ -9,6 +9,7 @@ export default function ScreenManager() {
   const [history, setHistory] = useState<Step[]>([]);
   const lastAutoStepRef = useRef<Step | null>(null);
   const manualStayOnProjectsRef = useRef(false);
+  const bootHandledRef = useRef(false);
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -17,6 +18,17 @@ export default function ScreenManager() {
     const isAuthed = Boolean(token && currentUser);
 
     if (!isAuthed) return "SignIn";
+
+    // Host boot detection:
+    // If Ableton/host was restarted, force the "Your Projects" screen first.
+    // We compare a runtime boot id injected by C++ to the last seen boot id persisted in PropertiesFile.
+    const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
+    const lastBootId = safeGetItem("sairyne_last_boot_id");
+    if (runtimeBootId && runtimeBootId !== lastBootId) {
+      // Persist for next opens within the same host process.
+      safeSetItem("sairyne_last_boot_id", runtimeBootId);
+      return "ChooseYourProject";
+    }
 
     // Project selection
     const selected = getSelectedProject();
@@ -39,6 +51,26 @@ export default function ScreenManager() {
 
   const tryAutoBootstrap = () => {
     try {
+      // Prevent repeated boot-id writes / flip-flopping.
+      // Once we have handled a "new host boot" decision, we can continue normal logic.
+      if (!bootHandledRef.current) {
+        const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
+        const lastBootId = safeGetItem("sairyne_last_boot_id");
+        if (runtimeBootId && runtimeBootId !== lastBootId) {
+          bootHandledRef.current = true;
+          manualStayOnProjectsRef.current = true;
+          setHistory([]);
+          setCurrentStep("ChooseYourProject");
+          // safeSetItem already called inside computeAutoStartStep on next tick;
+          // but do it here too for deterministic behavior.
+          safeSetItem("sairyne_last_boot_id", runtimeBootId);
+          return;
+        }
+        if (runtimeBootId && runtimeBootId === lastBootId) {
+          bootHandledRef.current = true;
+        }
+      }
+
       // If user explicitly navigated to the projects list, don't auto-jump back into chat.
       if (manualStayOnProjectsRef.current && currentStep === "ChooseYourProject") {
         return;
