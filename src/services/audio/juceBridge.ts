@@ -434,7 +434,8 @@ export function saveDataToJuce(key: string, value: string): void {
     console.log('[JUCE Bridge] ⏳ Bridge not ready, storing in pendingSave queue');
     console.log('[JUCE Bridge] ⏳ This save will be processed when onJuceInit fires');
     setPendingSave(key, value);
-    return;
+    // IMPORTANT (AU/WKWebView): still attempt to send immediately via postMessage.
+    // juce_init can race with app boot; if we wait for juceReady, saves can be stuck forever.
   }
 
   // Preferred in plugin iframe: JUCE native event listener
@@ -469,7 +470,7 @@ export function loadDataFromJuce(key: string): void {
   if (!isJuceReady()) {
     console.warn('[JUCE Bridge] ⚠️ Bridge not ready, queueing load request');
     setPendingLoad(key);
-    return;
+    // IMPORTANT (AU/WKWebView): still attempt the request immediately via postMessage.
   }
 
   // Preferred in plugin iframe: JUCE native event listener
