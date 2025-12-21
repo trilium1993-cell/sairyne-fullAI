@@ -8,7 +8,6 @@ import {
   removeProject,
   renameProject,
   setSelectedProject,
-  clearSelectedProject,
   getSelectedProject,
 } from "../../services/projects";
 import { safeGetItem, safeSetItem } from "../../utils/storage";
@@ -41,7 +40,6 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
     const preselected = getSelectedProject();
     if (preselected) {
       setSelectedProjectState(preselected);
-      clearSelectedProject();
     }
   }, []);
 

@@ -19,7 +19,7 @@ import { ChatService } from "../../services/chatService";
 import closeIcon from '../../assets/img/vector.svg';
 import { resolveIsEmbedded } from "../../utils/embed";
 import { AnalyticsService } from "../../services/analyticsService";
-import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
+import { getSelectedProject } from "../../services/projects";
 import { getActiveUserEmail } from "../../services/auth";
 import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
 import { safeJsonParse } from "../../utils/safeJson";
@@ -493,12 +493,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const selectedProject = getSelectedProject();
     if (selectedProject && selectedProject.name) {
       setProjectName(selectedProject.name);
-    } else {
-      const latestProject = getLatestProject();
-      if (latestProject) {
-        setSelectedProject(latestProject);
-        setProjectName(latestProject.name);
-      }
     }
 
     // Получаем информацию о текущем пользователе
