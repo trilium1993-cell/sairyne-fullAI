@@ -1,10 +1,82 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Step, NEXT } from "../flow/steps";
 import { getScreenComponent } from "../flow/registry";
+import { safeGetItem } from "../utils/storage";
+import { getLatestProject, getSelectedProject, setSelectedProject } from "../services/projects";
 
 export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
   const [history, setHistory] = useState<Step[]>([]);
+  const lastAutoStepRef = useRef<Step | null>(null);
+
+  const computeAutoStartStep = (): Step => {
+    // Auth
+    const token = safeGetItem("sairyne_access_token");
+    const currentUser = safeGetItem("sairyne_current_user");
+    const isAuthed = Boolean(token && currentUser);
+
+    if (!isAuthed) return "SignIn";
+
+    // Project selection
+    const selected = getSelectedProject();
+    if (selected) return "StartChat1";
+
+    // If there are projects, auto-select the latest to avoid forcing the chooser screen.
+    const rawProjects = safeGetItem("sairyne_projects");
+    if (rawProjects) {
+      const latest = getLatestProject();
+      if (latest) {
+        setSelectedProject(latest);
+        return "StartChat1";
+      }
+      return "ChooseYourProject";
+    }
+
+    // No projects stored yet -> show onboarding
+    return "CreateYourFirstProject";
+  };
+
+  const tryAutoBootstrap = () => {
+    try {
+      const step = computeAutoStartStep();
+      // Avoid thrashing / repeated state updates
+      if (lastAutoStepRef.current === step) return;
+      lastAutoStepRef.current = step;
+
+      if (step !== currentStep) {
+        setHistory([]);
+        setCurrentStep(step);
+      }
+    } catch {
+      // best-effort; fall back to manual navigation
+    }
+  };
+
+  useEffect(() => {
+    // Try immediately (may still be before JUCE inject), then retry when data arrives.
+    tryAutoBootstrap();
+
+    const onDataLoaded = () => tryAutoBootstrap();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("sairyne-init-loaded", onDataLoaded as any);
+      window.addEventListener("sairyne-data-loaded", onDataLoaded as any);
+    }
+
+    // Small retry window to handle AU timing / slow init without needing user interaction.
+    const t = window.setInterval(() => tryAutoBootstrap(), 600);
+    const stop = window.setTimeout(() => window.clearInterval(t), 6000);
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("sairyne-init-loaded", onDataLoaded as any);
+        window.removeEventListener("sairyne-data-loaded", onDataLoaded as any);
+      }
+      window.clearInterval(t);
+      window.clearTimeout(stop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onNext = () => {
     const nextStep = NEXT[currentStep];
