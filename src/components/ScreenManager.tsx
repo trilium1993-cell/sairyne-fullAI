@@ -70,6 +70,12 @@ export default function ScreenManager() {
         return;
       }
 
+      // If user is on the "Your projects" screen, never auto-route away from it.
+      // Navigation to chat must be explicit (project click / create+select).
+      if (currentStep === "ChooseYourProject") {
+        return;
+      }
+
       // Prevent repeated boot-id writes / flip-flopping.
       // Once we have handled a "new host boot" decision, we can continue normal logic.
       if (!bootHandledRef.current) {
