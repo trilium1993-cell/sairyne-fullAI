@@ -24,6 +24,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   const [contextMenu, setContextMenu] = useState<{ projectId: number; x: number; y: number } | null>(null);
   const [editingProject, setEditingProject] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
+  const [newlyCreatedProjectId, setNewlyCreatedProjectId] = useState<number | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   // Загружаем проекты из localStorage при монтировании компонента
@@ -77,9 +78,11 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
     const updatedProjects = listProjects();
     setProjects(updatedProjects);
     setFilteredProjects(updatedProjects);
-    setSelectedProject(newProject);
     setSelectedProjectState(newProject);
-    onNext();
+    setNewlyCreatedProjectId(newProject.id);
+    // Stay on "Your projects" and prompt user to rename immediately
+    setEditingProject(newProject.id);
+    setEditName(newProject.name);
   };
 
   const handleProjectClick = (projectId: number) => {
@@ -136,12 +139,16 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
       setFilteredProjects(updated);
       setEditingProject(null);
       setEditName("");
+      if (newlyCreatedProjectId === projectId) {
+        setNewlyCreatedProjectId(null);
+      }
     }
   };
 
   const handleCancelEdit = () => {
     setEditingProject(null);
     setEditName("");
+    setNewlyCreatedProjectId(null);
   };
 
   // Закрываем контекстное меню при клике вне
@@ -237,6 +244,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
               return sortedProjects.map((project, index) => {
                 const isSelected = selectedProjectState && project.id === selectedProjectState.id;
                 const isEditing = editingProject === project.id;
+                const isNew = newlyCreatedProjectId === project.id;
                 
                 return (
                   <li key={project.id}>
@@ -245,7 +253,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
                         isSelected 
                           ? 'bg-[#7322b620] border-[#7322b6] shadow-lg shadow-[#7322b640]' 
                           : 'bg-[#ffffff08] border-[#ffffff0f]'
-                      }`}
+                      } ${isNew ? 'ring-1 ring-[#7322b6] ring-offset-0' : ''}`}
                       style={{ top: `${index * 85}px` }}
                     >
                       {isEditing ? (
@@ -257,6 +265,10 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
                             onChange={(e) => setEditName(e.target.value)}
                             className="w-full px-2 py-1 bg-[#ffffff0d] border border-[#ffffff1c] rounded text-white text-sm outline-none focus:border-[#7322b6]"
                             autoFocus
+                            onFocus={(e) => {
+                              // Select default name so user can immediately rename
+                              e.currentTarget.select();
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleSaveEdit(project.id);
                               if (e.key === 'Escape') handleCancelEdit();
