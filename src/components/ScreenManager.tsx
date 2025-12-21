@@ -8,6 +8,7 @@ export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
   const [history, setHistory] = useState<Step[]>([]);
   const lastAutoStepRef = useRef<Step | null>(null);
+  const manualStayOnProjectsRef = useRef(false);
 
   const computeAutoStartStep = (): Step => {
     // Auth
@@ -38,6 +39,10 @@ export default function ScreenManager() {
 
   const tryAutoBootstrap = () => {
     try {
+      // If user explicitly navigated to the projects list, don't auto-jump back into chat.
+      if (manualStayOnProjectsRef.current && currentStep === "ChooseYourProject") {
+        return;
+      }
       const step = computeAutoStartStep();
       // Avoid thrashing / repeated state updates
       if (lastAutoStepRef.current === step) return;
@@ -81,6 +86,9 @@ export default function ScreenManager() {
   const onNext = () => {
     const nextStep = NEXT[currentStep];
     if (nextStep) {
+      if (currentStep === "ChooseYourProject") {
+        manualStayOnProjectsRef.current = false;
+      }
       setHistory(prev => [...prev, currentStep]);
       setCurrentStep(nextStep);
     }
@@ -91,6 +99,27 @@ export default function ScreenManager() {
       const previousStep = history[history.length - 1];
       setHistory(prev => prev.slice(0, -1));
       setCurrentStep(previousStep);
+      if (previousStep !== "ChooseYourProject") {
+        manualStayOnProjectsRef.current = false;
+      }
+      return;
+    }
+
+    // If there is no history (e.g. auto-resume straight into chat),
+    // allow "Return to Your Projects" to work by going to the projects list.
+    if (
+      currentStep === "StartChat1" ||
+      currentStep === "Chat2" ||
+      currentStep === "Chat3" ||
+      currentStep === "Chat4" ||
+      currentStep === "Chat5" ||
+      currentStep === "Chat6Tips" ||
+      currentStep === "Chat7Tips2" ||
+      currentStep === "Chat8"
+    ) {
+      manualStayOnProjectsRef.current = true;
+      setHistory([]);
+      setCurrentStep("ChooseYourProject");
     }
   };
 

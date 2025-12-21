@@ -290,6 +290,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         setShowCompletedStep(savedState.showCompletedStep);
         setCompletedStepText(savedState.completedStepText);
 
+        // Prevent re-sending the initial "workflow start" message on reopen.
+        if (savedState.messages && savedState.messages.length > 0) {
+          isInitializedRef.current = true;
+        }
+
         requestAnimationFrame(() => {
           if (chatContainerRef.current) {
             chatContainerRef.current.scrollTop = savedState.scrollPosition ?? 0;
@@ -826,7 +831,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Инициализация первого сообщения
   useEffect(() => {
-    if (!isInitializedRef.current) {
+    // Only send the first workflow prompt if there is truly no restored chat state.
+    if (!isInitializedRef.current && messages.length === 0) {
       isInitializedRef.current = true;
       const firstStep = chatSteps[0];
       addAIMessage(firstStep.ai, () => {
@@ -837,7 +843,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }, 500); // Небольшая задержка после завершения анимации
       });
     }
-  }, [chatSteps, addAIMessage]);
+  }, [chatSteps, addAIMessage, messages.length]);
 
   useEffect(() => {
     AnalyticsService.track('PluginOpened', { embedded: isEmbedded });
