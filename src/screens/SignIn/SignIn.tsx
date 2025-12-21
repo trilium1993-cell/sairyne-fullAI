@@ -4,6 +4,7 @@ import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { getCurrentUser } from "../../services/auth";
 import { openUrlInSystemBrowser } from "../../services/audio/juceBridge";
 import { resolveIsEmbedded } from "../../utils/embed";
+import { safeSetItem, safeGetItem } from "../../utils/storage";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
 import { API_URL } from "../../config/api";
 
@@ -20,6 +21,12 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
     const user = typeof window !== "undefined" ? getCurrentUser() : null;
     if (user?.email) {
       setEmail(user.email);
+      return;
+    }
+    // Fallback: restore draft email (useful when plugin UI reloads before login)
+    const draft = safeGetItem('sairyne_signin_draft_email');
+    if (draft) {
+      setEmail(draft);
     }
   }, []);
   const [showError, setShowError] = useState(false);
@@ -145,10 +152,26 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       console.log('✅ Login successful!', data);
 
       // User authenticated! Save locally
-      if (typeof window !== "undefined" && window.localStorage) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('email', data.user.email);
+      try {
+        // Persist in JUCE-backed storage (source of truth in plugin)
+        safeSetItem('sairyne_access_token', String(data.token ?? ''));
+        safeSetItem(
+          'sairyne_current_user',
+          JSON.stringify({
+            id: typeof data.user?.id === 'number' ? data.user.id : Date.now(),
+            email: String(data.user?.email ?? email).trim(),
+            password: '',
+            loginTime: new Date().toISOString(),
+          })
+        );
+        // Also keep legacy keys as cache/debug (optional)
+        if (typeof window !== "undefined" && window.localStorage) {
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('email', data.user.email);
+        }
+      } catch (e) {
+        console.warn('[SignIn] Failed to persist auth via safeSetItem:', e);
       }
 
       onNext();
@@ -180,6 +203,17 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       e.preventDefault();
     }
   };
+
+  // Persist draft email so it doesn't disappear when AU/VST3 UI reloads
+  useEffect(() => {
+    try {
+      if (email && email.trim().length > 0) {
+        safeSetItem('sairyne_signin_draft_email', email.trim());
+      }
+    } catch {
+      // ignore
+    }
+  }, [email]);
 
   const handleForgotPassword = () => {
     const url = 'https://www.sairyne.net/reset-password';

@@ -116,8 +116,9 @@ if (typeof window !== 'undefined') {
   if (!(window as any).__sairyneJuceReady) {
     (window as any).__sairyneJuceReady = false;
   }
-  if (!(window as any).__sairynePendingSave) {
-    (window as any).__sairynePendingSave = null as { key: string; value: string } | null;
+  // Store ALL pending saves (multiple keys can be written before bridge is ready)
+  if (!(window as any).__sairynePendingSaves) {
+    (window as any).__sairynePendingSaves = new Map<string, string>();
   }
 }
 
@@ -143,21 +144,22 @@ function setJuceReady(ready: boolean): void {
  */
 function setPendingSave(key: string, value: string): void {
   if (typeof window === 'undefined') return;
-  (window as any).__sairynePendingSave = { key, value };
-  console.log('[JUCE Bridge] 💾 Stored pending save:', key, `value length: ${value.length}`);
+  const pending: Map<string, string> = (window as any).__sairynePendingSaves;
+  pending.set(key, value);
+  console.log('[JUCE Bridge] 💾 Stored pending save:', key, `value length: ${value.length}`, 'pending count:', pending.size);
 }
 
 /**
- * Get and clear pending save operation
+ * Get and clear pending save operations
  */
-function getPendingSave(): { key: string; value: string } | null {
-  if (typeof window === 'undefined') return null;
-  const pending = (window as any).__sairynePendingSave;
-  if (pending) {
-    (window as any).__sairynePendingSave = null;
-    console.log('[JUCE Bridge] 📤 Retrieved pending save:', pending.key);
-  }
-  return pending;
+function getPendingSaves(): Array<{ key: string; value: string }> {
+  if (typeof window === 'undefined') return [];
+  const pending: Map<string, string> = (window as any).__sairynePendingSaves;
+  if (!pending || pending.size === 0) return [];
+  const entries = Array.from(pending.entries()).map(([key, value]) => ({ key, value }));
+  pending.clear();
+  console.log('[JUCE Bridge] 📤 Retrieved pending saves:', entries.length);
+  return entries;
 }
 
 /**
@@ -487,11 +489,13 @@ if (typeof window !== 'undefined') {
       }
     }
     
-    // Process pending save if exists
-    const pending = getPendingSave();
-    if (pending) {
-      console.log('[JUCE Bridge] 📤 Processing pending save:', pending.key);
-      sendToJuceViaPostMessage('save_data', { key: pending.key, value: pending.value });
+    // Process pending saves (can be multiple keys)
+    const pendingSaves = getPendingSaves();
+    if (pendingSaves.length > 0) {
+      console.log('[JUCE Bridge] 📤 Processing pending saves:', pendingSaves.length);
+      pendingSaves.forEach(({ key, value }) => {
+        sendToJuceViaPostMessage('save_data', { key, value });
+      });
     }
     
     // Trigger custom event to notify components

@@ -20,6 +20,8 @@ import closeIcon from '../../assets/img/vector.svg';
 import { resolveIsEmbedded } from "../../utils/embed";
 import { AnalyticsService } from "../../services/analyticsService";
 import { getLatestProject, getSelectedProject, setSelectedProject } from "../../services/projects";
+import { getActiveUserEmail } from "../../services/auth";
+import { safeGetItem, safeSetItem } from "../../utils/storage";
 
 const SEND_ICON = "https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg";
 const ANALYSIS_ICON = "https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg";
@@ -225,8 +227,104 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   });
   const previousModeRef = useRef<string>(selectedLearnLevel);
 
+  const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
+
+  const sanitizeMessages = (msgs: Message[]): Message[] =>
+    msgs.map((m) => ({
+      ...m,
+      isVisible: true,
+      isTyping: false,
+    }));
+
+  const tryHydrateFromStorage = useCallback(() => {
+    try {
+      const raw = safeGetItem(CHAT_STATE_KEY);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return false;
+
+      if (typeof parsed.selectedLearnLevel === 'string') {
+        setSelectedLearnLevel(parsed.selectedLearnLevel);
+        previousModeRef.current = parsed.selectedLearnLevel;
+      }
+
+      if (typeof parsed.completedSteps === 'number') setCompletedSteps(parsed.completedSteps);
+      if (typeof parsed.hasCompletedAnalysis === 'boolean') setHasCompletedAnalysis(parsed.hasCompletedAnalysis);
+
+      // Restore mode states
+      if (parsed.modeStates && typeof parsed.modeStates === 'object') {
+        const restored: any = {};
+        ['learn', 'create', 'pro'].forEach((mode) => {
+          const st = parsed.modeStates[mode];
+          if (st && typeof st === 'object') {
+            restored[mode] = {
+              messages: Array.isArray(st.messages) ? sanitizeMessages(st.messages) : [],
+              currentStep: typeof st.currentStep === 'number' ? st.currentStep : 0,
+              scrollPosition: typeof st.scrollPosition === 'number' ? st.scrollPosition : 0,
+              showOptions: !!st.showOptions,
+              showGenres: !!st.showGenres,
+              showReadyButton: !!st.showReadyButton,
+              showCompletedStep: !!st.showCompletedStep,
+              completedStepText: typeof st.completedStepText === 'string' ? st.completedStepText : '',
+            };
+          }
+        });
+        if (Object.keys(restored).length > 0) {
+          modeStatesRef.current = {
+            learn: restored.learn ?? modeStatesRef.current.learn,
+            create: restored.create ?? modeStatesRef.current.create,
+            pro: restored.pro ?? modeStatesRef.current.pro,
+          };
+        }
+      }
+
+      // Apply current mode state to UI
+      const active = previousModeRef.current || 'learn';
+      const savedState = modeStatesRef.current[active];
+      if (savedState) {
+        setMessages([...savedState.messages]);
+        setCurrentStep(savedState.currentStep);
+        setShowOptions(savedState.showOptions);
+        setShowGenres(savedState.showGenres);
+        setShowReadyButton(savedState.showReadyButton);
+        setShowCompletedStep(savedState.showCompletedStep);
+        setCompletedStepText(savedState.completedStepText);
+
+        requestAnimationFrame(() => {
+          if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = savedState.scrollPosition ?? 0;
+          }
+        });
+      }
+
+      return true;
+    } catch (e) {
+      console.warn('[FunctionalChat] Failed to hydrate chat state:', e);
+      return false;
+    }
+  }, []);
+
   // Инициализация состояния для текущего режима при первом рендере
   useEffect(() => {
+    // 1) Try hydrate chat state early
+    tryHydrateFromStorage();
+
+    // 2) If data arrives from JUCE later, re-hydrate once
+    const onDataLoaded = (e: any) => {
+      const key = e?.detail?.key;
+      if (key === CHAT_STATE_KEY || key === 'sairyne_selected_project' || key === 'sairyne_projects') {
+        tryHydrateFromStorage();
+        // Also refresh project name when selected project data arrives late
+        const selectedProject = getSelectedProject();
+        if (selectedProject?.name) {
+          setProjectName(selectedProject.name);
+        }
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('sairyne-data-loaded', onDataLoaded as any);
+    }
+
     const savedState = modeStatesRef.current[selectedLearnLevel];
     if (savedState && savedState.messages.length > 0) {
       setMessages([...savedState.messages]);
@@ -238,7 +336,33 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       setCompletedStepText(savedState.completedStepText);
     }
     previousModeRef.current = selectedLearnLevel;
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('sairyne-data-loaded', onDataLoaded as any);
+      }
+    };
   }, []); // Только при монтировании
+
+  // Persist chat state (debounced) so AU/VST3 window reload doesn't wipe it
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      try {
+        const payload = {
+          v: 1,
+          ownerEmail: getActiveUserEmail(),
+          selectedLearnLevel,
+          completedSteps,
+          hasCompletedAnalysis,
+          modeStates: modeStatesRef.current,
+          savedAt: Date.now(),
+        };
+        safeSetItem(CHAT_STATE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('[FunctionalChat] Failed to persist chat state:', e);
+      }
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
   // Автоматическое сохранение состояния для текущего режима при изменениях
   useEffect(() => {
