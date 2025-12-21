@@ -120,6 +120,10 @@ if (typeof window !== 'undefined') {
   if (!(window as any).__sairynePendingSaves) {
     (window as any).__sairynePendingSaves = new Map<string, string>();
   }
+  // Store pending loads requested before bridge is ready
+  if (!(window as any).__sairynePendingLoadKeys) {
+    (window as any).__sairynePendingLoadKeys = new Set<string>();
+  }
 }
 
 /**
@@ -149,6 +153,13 @@ function setPendingSave(key: string, value: string): void {
   console.log('[JUCE Bridge] 💾 Stored pending save:', key, `value length: ${value.length}`, 'pending count:', pending.size);
 }
 
+function setPendingLoad(key: string): void {
+  if (typeof window === 'undefined') return;
+  const pending: Set<string> = (window as any).__sairynePendingLoadKeys;
+  pending.add(key);
+  console.log('[JUCE Bridge] ⏳ Stored pending load:', key, 'pending loads:', pending.size);
+}
+
 /**
  * Get and clear pending save operations
  */
@@ -162,6 +173,15 @@ function getPendingSaves(): Array<{ key: string; value: string }> {
   return entries;
 }
 
+function getPendingLoads(): string[] {
+  if (typeof window === 'undefined') return [];
+  const pending: Set<string> = (window as any).__sairynePendingLoadKeys;
+  if (!pending || pending.size === 0) return [];
+  const keys = Array.from(pending);
+  pending.clear();
+  console.log('[JUCE Bridge] 📤 Retrieved pending loads:', keys.length);
+  return keys;
+}
 /**
  * Send message to JUCE via postMessage (iframe → wrapper → JUCE)
  */
@@ -418,7 +438,8 @@ export function loadDataFromJuce(key: string): void {
   
   // If bridge is not ready, we can't load yet
   if (!isJuceReady()) {
-    console.warn('[JUCE Bridge] ⚠️ Bridge not ready, cannot load data yet');
+    console.warn('[JUCE Bridge] ⚠️ Bridge not ready, queueing load request');
+    setPendingLoad(key);
     return;
   }
   
@@ -531,16 +552,37 @@ if (typeof window !== 'undefined') {
     if (pendingSaves.length > 0) {
       console.log('[JUCE Bridge] 📤 Processing pending saves:', pendingSaves.length);
       pendingSaves.forEach(({ key, value }) => {
-        sendToJuceViaPostMessage('save_data', { key, value });
+        try {
+          const juceUrl = `juce://save?key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
+          navigateToJuceScheme(juceUrl);
+        } catch (e) {
+          console.warn('[JUCE Bridge] ⚠️ Failed to process pending save via juce scheme:', key, e);
+        }
+      });
+    }
+
+    // Process pending loads (requested before bridge was ready)
+    const pendingLoads = getPendingLoads();
+    if (pendingLoads.length > 0) {
+      console.log('[JUCE Bridge] 📤 Processing pending loads:', pendingLoads.length);
+      pendingLoads.forEach((key) => {
+        try {
+          const juceUrl = `juce://load?key=${encodeURIComponent(key)}`;
+          navigateToJuceScheme(juceUrl);
+        } catch (e) {
+          console.warn('[JUCE Bridge] ⚠️ Failed to process pending load:', key, e);
+        }
       });
     }
     
     // Trigger custom event to notify components
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('sairyne-data-loaded', {
-        detail: data
-      }));
-      console.log('[JUCE Bridge] ✅ Dispatched sairyne-data-loaded event');
+      // Emit a bulk event + per-key events (per-key is what most components listen for)
+      window.dispatchEvent(new CustomEvent('sairyne-init-loaded', { detail: data }));
+      Object.entries(data).forEach(([key, value]) => {
+        window.dispatchEvent(new CustomEvent('sairyne-data-loaded', { detail: { key, value } }));
+      });
+      console.log('[JUCE Bridge] ✅ Dispatched sairyne-init-loaded + per-key sairyne-data-loaded events');
     }
   };
 }
@@ -610,3 +652,4 @@ export function logToJuce(message: string, level: 'info' | 'warn' | 'error' = 'i
 
 // Экспортируем bridge для продвинутого использования
 export default bridge;
+
