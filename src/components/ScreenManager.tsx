@@ -14,6 +14,19 @@ export default function ScreenManager() {
   const forceProjectsRef = useRef(false);
   const LAST_STEP_KEY = "sairyne_ui_last_step";
 
+  const isChatStep = (step: Step | string | null): step is Step => {
+    return (
+      step === "StartChat1" ||
+      step === "Chat2" ||
+      step === "Chat3" ||
+      step === "Chat4" ||
+      step === "Chat5" ||
+      step === "Chat6Tips" ||
+      step === "Chat7Tips2" ||
+      step === "Chat8"
+    );
+  };
+
   const computeAutoStartStep = (): Step => {
     // Auth
     const token = safeGetItem("sairyne_access_token");
@@ -44,8 +57,19 @@ export default function ScreenManager() {
       return "ChooseYourProject";
     }
 
-    // New UX requirement:
-    // Once signed in (within same OS boot), always start from "Your projects".
+    // Same DAW session (no host restart): resume last screen when reopening the plugin window.
+    // If last screen was chat, keep user in chat; if it was projects, stay on projects.
+    const lastUiStep = safeGetItem(LAST_STEP_KEY);
+    if (lastUiStep === "ChooseYourProject") {
+      return "ChooseYourProject";
+    }
+    if (isChatStep(lastUiStep)) {
+      // Only resume chat if a project is selected; otherwise fall back to projects.
+      const selected = getSelectedProject();
+      return selected ? (lastUiStep as Step) : "ChooseYourProject";
+    }
+
+    // Default after sign-in within same OS boot: start at projects.
     return "ChooseYourProject";
   };
 
