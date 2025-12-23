@@ -165,20 +165,10 @@ export function saveUser(user: AuthUser): AuthUser {
 }
 
 export function getCurrentUser(): AuthUser | null {
-  const direct = readCurrentUser();
-  if (direct) {
-    return direct;
-  }
-
-  const users = parseUsers();
-  if (users.length > 0) {
-    const fallback = users[users.length - 1];
-    // ensure current user cache is populated for future reads
-    setCurrentUser(fallback);
-    return fallback;
-  }
-
-  return null;
+  // Security / UX requirement:
+  // If there is no explicit current user session, treat as signed out.
+  // (We still keep draft email separately for convenience.)
+  return readCurrentUser();
 }
 
 function ensureAccessToken() {

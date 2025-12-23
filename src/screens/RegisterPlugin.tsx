@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config/api';
 import '../styles/RegisterPlugin.css';
+import { safeSetItem } from '../utils/storage';
 
 export const RegisterPlugin: React.FC = () => {
   const navigate = useNavigate();
@@ -37,13 +38,47 @@ export const RegisterPlugin: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/simple-register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      const rawBases = [
+        API_URL,
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'https://sairyne-fullai-5.onrender.com',
+      ];
+
+      const locationProtocol = typeof window !== 'undefined' ? window.location.protocol : 'n/a';
+      const candidateBases = Array.from(
+        new Set(
+          rawBases.filter((b) => {
+            if (b === '' || b == null) return true;
+            if (locationProtocol === 'https:' && b.startsWith('http://')) return false;
+            return true;
+          })
+        )
+      );
+
+      const requestBody = JSON.stringify({ email: email.trim(), password });
+
+      let response: Response | null = null;
+      let lastError: any = null;
+
+      for (const base of candidateBases) {
+        try {
+          const url = base ? `${base}/api/auth/simple-register` : '/api/auth/simple-register';
+          response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: requestBody,
+          });
+          break;
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!response) {
+        setError(`Network error. Unable to reach register server. ${lastError?.message ?? ''}`);
+        return;
+      }
 
       const data = await response.json();
 
@@ -53,9 +88,10 @@ export const RegisterPlugin: React.FC = () => {
       }
 
       setSuccess(true);
-      // Store token
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      // Prefill email on SignIn and return to plugin main flow
+      try {
+        safeSetItem('sairyne_signin_draft_email', email.trim());
+      } catch {}
 
       // Redirect after 2 seconds
       setTimeout(() => {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Step, NEXT } from "../flow/steps";
 import { getScreenComponent } from "../flow/registry";
-import { safeGetItem, safeSetItem } from "../utils/storage";
-import { getLatestProject, getSelectedProject, setSelectedProject } from "../services/projects";
+import { safeGetItem, safeSetItem, safeRemoveItem } from "../utils/storage";
+import { getSelectedProject } from "../services/projects";
 
 export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
@@ -22,6 +22,17 @@ export default function ScreenManager() {
 
     if (!isAuthed) return "SignIn";
 
+    // Computer reboot detection:
+    // If OS boot changed, require password again (but keep draft email).
+    const osBootId = safeGetItem("sairyne_os_boot_id");
+    const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
+    if (osBootId && lastOsBootId && osBootId !== lastOsBootId) {
+      safeRemoveItem("sairyne_access_token");
+      safeRemoveItem("sairyne_current_user");
+      safeRemoveItem("sairyne_selected_project");
+      return "SignIn";
+    }
+
     // Host boot detection:
     // If Ableton/host was restarted, force the "Your Projects" screen first.
     // We compare a runtime boot id injected by C++ to the last seen boot id persisted in PropertiesFile.
@@ -33,30 +44,9 @@ export default function ScreenManager() {
       return "ChooseYourProject";
     }
 
-    // If the user last left the UI on the projects screen (within same host boot),
-    // respect that and keep them there on reopen.
-    const lastUiStep = safeGetItem(LAST_STEP_KEY);
-    if (lastUiStep === "ChooseYourProject") {
-      return "ChooseYourProject";
-    }
-
-    // Project selection
-    const selected = getSelectedProject();
-    if (selected) return "StartChat1";
-
-    // If there are projects, auto-select the latest to avoid forcing the chooser screen.
-    const rawProjects = safeGetItem("sairyne_projects");
-    if (rawProjects) {
-      const latest = getLatestProject();
-      if (latest) {
-        setSelectedProject(latest);
-        return "StartChat1";
-      }
-      return "ChooseYourProject";
-    }
-
-    // No projects stored yet -> show onboarding
-    return "CreateYourFirstProject";
+    // New UX requirement:
+    // Once signed in (within same OS boot), always start from "Your projects".
+    return "ChooseYourProject";
   };
 
   const tryAutoBootstrap = () => {
@@ -194,6 +184,13 @@ export default function ScreenManager() {
       if (previousStep !== "ChooseYourProject") {
         manualStayOnProjectsRef.current = false;
       }
+      return;
+    }
+
+    // From Projects screen, allow returning to Sign In (e.g. user wants to switch accounts).
+    if (currentStep === "ChooseYourProject") {
+      setHistory([]);
+      setCurrentStep("SignIn");
       return;
     }
 

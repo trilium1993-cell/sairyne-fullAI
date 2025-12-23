@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Window } from "../../components/Window";
 import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { getCurrentUser } from "../../services/auth";
@@ -14,6 +15,7 @@ interface SignInProps {
 }
 
 export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
+  const navigate = useNavigate();
   const existingUser = typeof window !== "undefined" ? getCurrentUser() : null;
   const [email, setEmail] = useState(existingUser?.email ?? "");
   const [password, setPassword] = useState("");
@@ -153,6 +155,10 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
       // User authenticated! Save locally
       try {
+        const osBootId = safeGetItem("sairyne_os_boot_id");
+        if (osBootId) {
+          safeSetItem("sairyne_last_os_boot_id", osBootId);
+        }
         // Persist in JUCE-backed storage (source of truth in plugin)
         safeSetItem('sairyne_access_token', String(data.token ?? ''));
         safeSetItem(
@@ -222,9 +228,8 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleSignUp = () => {
-    const url = 'https://www.sairyne.net/register';
-    // Always go through the JUCE bridge helper; AU (WKWebView) can block direct window.open.
-    openUrlInSystemBrowser(url);
+    // In-plugin registration
+    navigate('/register');
   };
 
   const closeError = () => {

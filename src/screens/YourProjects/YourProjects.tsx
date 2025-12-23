@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Window } from "../../components/Window";
 import { ClearChatConfirmation } from "../../components/ClearChatConfirmation";
+import { BackToSignInConfirmation } from "../../components/BackToSignInConfirmation";
 import {
   StoredProject,
   createProject,
@@ -10,7 +11,7 @@ import {
   setSelectedProject,
   getSelectedProject,
 } from "../../services/projects";
-import { safeGetItem, safeSetItem } from "../../utils/storage";
+import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
 import { getActiveUserEmail } from "../../services/auth";
 
 interface YourProjectsProps {
@@ -28,6 +29,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
   const [editName, setEditName] = useState("");
   const [newlyCreatedProjectId, setNewlyCreatedProjectId] = useState<number | null>(null);
   const [clearChatProject, setClearChatProject] = useState<StoredProject | null>(null);
+  const [showBackToSignIn, setShowBackToSignIn] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
 
@@ -229,6 +231,17 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
           className="absolute top-[calc(50.00%_-_429px)] left-[calc(50.00%_-_140px)] w-[278px] h-[278px] bg-[#6e24ab5e] rounded-[139px] blur-[122px]"
           aria-hidden="true"
         />
+
+        <button
+          onClick={() => setShowBackToSignIn(true)}
+          className="absolute top-[23px] left-[12px] w-8 h-8 flex items-center justify-center hover:opacity-80 transition-opacity"
+          aria-label="Back to Sign In"
+          type="button"
+        >
+          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
 
         <h2 className="absolute top-[25px] left-[calc(50.00%_-_146px)] font-h2 font-[number:var(--h2-font-weight)] text-[#f7efff] text-[length:var(--h2-font-size)] tracking-[var(--h2-letter-spacing)] leading-[var(--h2-line-height)] [font-style:var(--h2-font-style)]">
           Your projects
@@ -482,6 +495,18 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
         onClose={() => setClearChatProject(null)}
         onConfirm={() => {
           if (clearChatProject) doClearChatForProject(clearChatProject);
+        }}
+      />
+
+      <BackToSignInConfirmation
+        isVisible={showBackToSignIn}
+        onClose={() => setShowBackToSignIn(false)}
+        onConfirm={() => {
+          // Sign out but keep draft email for convenience.
+          safeRemoveItem('sairyne_access_token');
+          safeRemoveItem('sairyne_current_user');
+          safeRemoveItem('sairyne_selected_project');
+          onBack();
         }}
       />
     </>
