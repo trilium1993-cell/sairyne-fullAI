@@ -172,6 +172,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
   const [userInput, setUserInput] = useState("");
+  const [isProjectSessionReady, setIsProjectSessionReady] = useState(false);
   
   const [showOptions, setShowOptions] = useState(false);
   const [showGenres, setShowGenres] = useState(false);
@@ -376,8 +377,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Инициализация состояния для текущего режима при первом рендере
   useEffect(() => {
     // 1) Try hydrate chat state early
-    tryHydrateFromStorage();
-    lastSessionKeyRef.current = resolveActiveSessionKey();
+    const initialKey = resolveActiveSessionKey();
+    lastSessionKeyRef.current = initialKey;
+    setIsProjectSessionReady(Boolean(initialKey));
+    // Only attempt hydrate when we know which project's session we are in
+    if (initialKey) {
+      tryHydrateFromStorage();
+    }
 
     // 2) If data arrives from JUCE later, re-hydrate once
     const onDataLoaded = (e: any) => {
@@ -385,12 +391,16 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       if (key === CHAT_STATE_KEY || key === 'sairyne_selected_project' || key === 'sairyne_projects') {
         // If selected project changed, reset to blank BEFORE hydrating.
         const nextSessionKey = resolveActiveSessionKey();
+        setIsProjectSessionReady(Boolean(nextSessionKey));
         if (nextSessionKey && nextSessionKey !== lastSessionKeyRef.current) {
           lastSessionKeyRef.current = nextSessionKey;
           resetUiToBlankSession();
         }
 
-        tryHydrateFromStorage();
+        // Only hydrate when we have a project session key.
+        if (nextSessionKey) {
+          tryHydrateFromStorage();
+        }
         // Also refresh project name when selected project data arrives late
         const selectedProject = getSelectedProject();
         if (selectedProject?.name) {
@@ -936,6 +946,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Инициализация первого сообщения
   useEffect(() => {
+    // Wait until we have a selected project (prevents flicker when selected_project arrives late)
+    if (!isProjectSessionReady) return;
     // Only send the first workflow prompt if there is truly no restored chat state.
     if (!isInitializedRef.current && messages.length === 0) {
       isInitializedRef.current = true;
@@ -948,7 +960,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }, 500); // Небольшая задержка после завершения анимации
       });
     }
-  }, [chatSteps, addAIMessage, messages.length]);
+  }, [isProjectSessionReady, chatSteps, addAIMessage, messages.length]);
 
   useEffect(() => {
     AnalyticsService.track('PluginOpened', { embedded: isEmbedded });
