@@ -171,6 +171,8 @@ interface FunctionalChatProps {
 export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
+  const sendLockRef = useRef(false);
+  const lastSendAtRef = useRef(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
   const [userInput, setUserInput] = useState("");
@@ -830,6 +832,18 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Обработка отправки сообщения
   const handleSendMessage = async () => {
+    // Guard against double-trigger (Enter + click, key repeat, WKWebView duplicate keydown)
+    const now = Date.now();
+    if (sendLockRef.current && now - lastSendAtRef.current < 800) {
+      return;
+    }
+    sendLockRef.current = true;
+    lastSendAtRef.current = now;
+    // Always release the lock shortly after; prevents accidental double-send without blocking normal typing.
+    window.setTimeout(() => {
+      sendLockRef.current = false;
+    }, 350);
+
     if (!userInput.trim()) {
       console.log('[FunctionalChat] handleSendMessage: Empty input, ignoring');
       return;
