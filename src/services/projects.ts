@@ -203,7 +203,14 @@ export function setSelectedProject(project: StoredProject | null): void {
       safeRemoveItem(SELECTED_PROJECT_KEY);
       return;
     }
-    const payload = { id: project.id, ownerEmail: project.ownerEmail, name: project.name };
+    // Store the full project (including createdAt) so we can restore reliably even if the
+    // projects list hasn't hydrated yet.
+    const payload: StoredProject = {
+      id: project.id,
+      ownerEmail: project.ownerEmail,
+      name: project.name,
+      createdAt: project.createdAt,
+    };
     const success = safeSetItem(SELECTED_PROJECT_KEY, JSON.stringify(payload));
     if (!success) {
       console.warn('[Projects] Failed to set selected project - localStorage blocked and JUCE not available');
@@ -219,8 +226,26 @@ export function getSelectedProject(): StoredProject | null {
   try {
     const raw = safeGetItem(SELECTED_PROJECT_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
+    const parsed = safeJsonParse<any>(raw, null);
     if (!parsed || typeof parsed.id !== "number") return null;
+
+    // If selected project contains enough info, trust it directly.
+    if (typeof parsed.name === "string" && typeof parsed.ownerEmail === "string") {
+      const createdAt =
+        typeof parsed.createdAt === "string" && parsed.createdAt.length > 0
+          ? parsed.createdAt
+          : (parseProjects().find((p) => p.id === parsed.id && p.ownerEmail === parsed.ownerEmail)?.createdAt ??
+              new Date().toISOString());
+
+      return {
+        id: parsed.id,
+        name: parsed.name,
+        ownerEmail: parsed.ownerEmail,
+        createdAt,
+      };
+    }
+
+    // Legacy: selected project only stored {id}. Try to resolve from current project list.
     const projects = listProjects();
     return projects.find((project) => project.id === parsed.id) ?? null;
   } catch (error) {

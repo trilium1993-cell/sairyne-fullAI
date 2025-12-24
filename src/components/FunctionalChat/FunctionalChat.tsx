@@ -233,10 +233,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
   const MAX_MESSAGES_PER_MODE = 200;
   const resolveActiveSessionKey = () => {
-    const ownerEmail = getActiveUserEmail();
     const selected = getSelectedProject();
     // If no project selected yet, do NOT reuse any previous chat session.
     if (!selected || typeof selected.id !== 'number') return null;
+    // Prefer project ownerEmail (stable even if current user data hasn't hydrated yet).
+    const ownerEmail = (selected as any)?.ownerEmail || getActiveUserEmail();
     return `${ownerEmail}:${selected.id}`;
   };
 
@@ -450,7 +451,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
         const sessionPayload = {
           v: 1,
-          ownerEmail: getActiveUserEmail(),
+          ownerEmail: (getSelectedProject() as any)?.ownerEmail || getActiveUserEmail(),
           selectedLearnLevel,
           completedSteps,
           hasCompletedAnalysis,
