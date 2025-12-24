@@ -208,6 +208,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const isEmbedded = resolveIsEmbedded();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  // Prevent the "first workflow prompt" from flashing before persisted state is hydrated.
+  const [isHydrationGateReady, setIsHydrationGateReady] = useState(false);
+  const hydrationTimerRef = useRef<number | null>(null);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
@@ -242,6 +245,22 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   };
 
   const lastSessionKeyRef = useRef<string | null>(null);
+  const startHydrationGate = useCallback((sessionKey: string | null) => {
+    if (hydrationTimerRef.current) {
+      window.clearTimeout(hydrationTimerRef.current);
+      hydrationTimerRef.current = null;
+    }
+    // If no session key (no project selected), keep gate closed.
+    if (!sessionKey) {
+      setIsHydrationGateReady(false);
+      return;
+    }
+    // Close gate and reopen after a short window to allow JUCE-injected chat state to arrive.
+    setIsHydrationGateReady(false);
+    hydrationTimerRef.current = window.setTimeout(() => {
+      setIsHydrationGateReady(true);
+    }, 900);
+  }, []);
 
   const resetUiToBlankSession = useCallback(() => {
     // Reset in-memory UI state so switching projects doesn't reuse previous project's chat
@@ -382,9 +401,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const initialKey = resolveActiveSessionKey();
     lastSessionKeyRef.current = initialKey;
     setIsProjectSessionReady(Boolean(initialKey));
+    startHydrationGate(initialKey);
     // Only attempt hydrate when we know which project's session we are in
     if (initialKey) {
-      tryHydrateFromStorage();
+      const ok = tryHydrateFromStorage();
+      // If we successfully hydrated, we can open the gate immediately.
+      if (ok) setIsHydrationGateReady(true);
     }
 
     // 2) If data arrives from JUCE later, re-hydrate once
@@ -397,11 +419,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         if (nextSessionKey && nextSessionKey !== lastSessionKeyRef.current) {
           lastSessionKeyRef.current = nextSessionKey;
           resetUiToBlankSession();
+          startHydrationGate(nextSessionKey);
         }
 
         // Only hydrate when we have a project session key.
         if (nextSessionKey) {
-          tryHydrateFromStorage();
+          const ok = tryHydrateFromStorage();
+          if (ok) setIsHydrationGateReady(true);
         }
         // Also refresh project name when selected project data arrives late
         const selectedProject = getSelectedProject();
@@ -428,6 +452,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('sairyne-data-loaded', onDataLoaded as any);
+      }
+      if (hydrationTimerRef.current) {
+        window.clearTimeout(hydrationTimerRef.current);
+        hydrationTimerRef.current = null;
       }
     };
   }, []); // Только при монтировании
@@ -957,6 +985,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     // Wait until we have a selected project (prevents flicker when selected_project arrives late)
     if (!isProjectSessionReady) return;
+    // Wait until hydration gate is ready (avoids flashing first prompt before persisted messages load)
+    if (!isHydrationGateReady) return;
     // Only send the first workflow prompt if there is truly no restored chat state.
     if (!isInitializedRef.current && messages.length === 0) {
       isInitializedRef.current = true;
@@ -969,7 +999,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }, 500); // Небольшая задержка после завершения анимации
       });
     }
-  }, [isProjectSessionReady, chatSteps, addAIMessage, messages.length]);
+  }, [isProjectSessionReady, isHydrationGateReady, chatSteps, addAIMessage, messages.length]);
 
   useEffect(() => {
     AnalyticsService.track('PluginOpened', { embedded: isEmbedded });
