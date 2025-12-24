@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Window } from "../../components/Window";
 import { MasterChannelNotice } from "../../components/MasterChannelNotice";
 import { getCurrentUser } from "../../services/auth";
@@ -16,7 +15,6 @@ interface SignInProps {
 }
 
 export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
-  const navigate = useNavigate();
   const existingUser = typeof window !== "undefined" ? getCurrentUser() : null;
   const [email, setEmail] = useState(existingUser?.email ?? "");
   const [password, setPassword] = useState("");
@@ -230,8 +228,9 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleSignUp = () => {
-    // In-plugin registration
-    navigate('/register');
+    // Open website registration/sign-in flow in system browser (plugin-safe).
+    // This avoids embedding registration inside the plugin WebView.
+    openUrlInSystemBrowser('https://www.sairyne.net/sign-in');
   };
 
   const closeError = () => {
