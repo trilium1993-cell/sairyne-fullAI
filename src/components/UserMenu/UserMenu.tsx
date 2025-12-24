@@ -3,6 +3,7 @@ import { openUrlInSystemBrowser } from "../../services/audio/juceBridge";
 import { resolveIsEmbedded } from "../../utils/embed";
 import { ResetDataConfirmation } from "../ResetDataConfirmation";
 import { resetAllLocalData } from "../../services/support";
+import { AnalyticsService } from "../../services/analyticsService";
 
 interface UserMenuProps {
   onClose?: () => void;
@@ -235,6 +236,7 @@ export const UserMenu = ({ onClose, isOpen = false }: UserMenuProps): JSX.Elemen
         onClose={() => setShowResetConfirm(false)}
         onConfirm={() => {
           resetAllLocalData();
+          AnalyticsService.track('ResetLocalData', {});
         }}
       />
     </>

@@ -4,11 +4,18 @@ export type AnalyticsEventName =
   | 'PluginOpened'
   | 'PluginClosed'
   | 'VisualTipClicked'
-  | 'AIMessageSent';
+  | 'AIMessageSent'
+  | 'SignInSuccess'
+  | 'RegisterSuccess'
+  | 'ProjectCreated'
+  | 'ProjectOpened'
+  | 'ChatMessageSent'
+  | 'ClearChat'
+  | 'ResetLocalData';
 
 type AnalyticsPayload = Record<string, unknown>;
 
-const ANALYTICS_ENDPOINT = '/analytics/event';
+const ANALYTICS_ENDPOINT = '/api/analytics/event';
 
 export class AnalyticsService {
   static async track(event: AnalyticsEventName, payload: AnalyticsPayload = {}): Promise<void> {

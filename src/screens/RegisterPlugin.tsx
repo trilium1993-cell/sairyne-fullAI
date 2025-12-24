@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_URL } from '../config/api';
 import '../styles/RegisterPlugin.css';
 import { safeSetItem } from '../utils/storage';
+import { AnalyticsService } from '../services/analyticsService';
 
 export const RegisterPlugin: React.FC = () => {
   const navigate = useNavigate();
@@ -88,6 +89,7 @@ export const RegisterPlugin: React.FC = () => {
       }
 
       setSuccess(true);
+      AnalyticsService.track('RegisterSuccess', { email: email.trim().toLowerCase() });
       // Prefill email on SignIn and return to plugin main flow
       try {
         safeSetItem('sairyne_signin_draft_email', email.trim());

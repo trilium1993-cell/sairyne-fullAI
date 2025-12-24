@@ -798,6 +798,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         
         return newMessages;
       });
+      try {
+        const selected = getSelectedProject();
+        AnalyticsService.track('ChatMessageSent', {
+          projectId: selected?.id ?? null,
+          mode: selectedLearnLevel,
+        });
+      } catch {}
       
       // Manual scrolling only - let user control
       

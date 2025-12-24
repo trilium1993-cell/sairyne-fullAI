@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Window } from "../../components/Window";
 import { ClearChatConfirmation } from "../../components/ClearChatConfirmation";
 import { BackToSignInConfirmation } from "../../components/BackToSignInConfirmation";
+import { AnalyticsService } from "../../services/analyticsService";
 import {
   StoredProject,
   createProject,
@@ -80,6 +81,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
 
   const handleAddProject = () => {
     const newProject = createProject();
+    AnalyticsService.track('ProjectCreated', { projectId: newProject.id });
     const updatedProjects = listProjects();
     setProjects(updatedProjects);
     setFilteredProjects(updatedProjects);
@@ -99,6 +101,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
     if (project) {
       setSelectedProject(project);
       setSelectedProjectState(project);
+      AnalyticsService.track('ProjectOpened', { projectId: project.id });
       if (import.meta.env.DEV) {
         console.debug('[yourProjects] selected project saved', project);
       }
@@ -166,6 +169,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
 
       parsed.sessions = sessions;
       safeSetItem(CHAT_STATE_KEY, JSON.stringify(parsed));
+      AnalyticsService.track('ClearChat', { projectId: project.id });
     } catch {
       // best-effort
     }

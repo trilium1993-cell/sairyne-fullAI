@@ -8,6 +8,7 @@ import { resolveIsEmbedded } from "../../utils/embed";
 import { safeSetItem, safeGetItem } from "../../utils/storage";
 import profilePhoto from "../../assets/img/photo-2025-10-18-23-33-13-1.png";
 import { API_URL } from "../../config/api";
+import { AnalyticsService } from "../../services/analyticsService";
 
 interface SignInProps {
   onNext: () => void;
@@ -180,6 +181,7 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
         console.warn('[SignIn] Failed to persist auth via safeSetItem:', e);
       }
 
+      AnalyticsService.track('SignInSuccess', { email: email.trim().toLowerCase() });
       onNext();
     } catch (error) {
       const err = error as any;
