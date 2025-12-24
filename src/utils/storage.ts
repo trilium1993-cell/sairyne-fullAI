@@ -45,6 +45,11 @@ function syncFromWindowStorage() {
 // Keys that must never be served from localStorage cache (runtime-only / host-provided)
 const NO_LOCALSTORAGE_KEYS = new Set<string>([
   'sairyne_runtime_boot_id',
+  // Host-provided; must not be cached (prevents false OS reboot logic / stale reads)
+  'sairyne_os_boot_id',
+  // UI routing keys; caching can cause "stuck on Sign In" loops across host restarts
+  'sairyne_ui_last_step',
+  'sairyne_ui_pin_signin',
 ]);
 
 /**

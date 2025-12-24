@@ -79,6 +79,8 @@ export default function ScreenManager() {
     const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
     const lastBootId = safeGetItem("sairyne_last_boot_id");
     if (runtimeBootId && runtimeBootId !== lastBootId) {
+      // Host restart should also clear any "pinned Sign In" (it is intended for a live session account switch).
+      safeRemoveItem(PIN_SIGNIN_KEY);
       // Persist for next opens within the same host process.
       safeSetItem("sairyne_last_boot_id", runtimeBootId);
       return "ChooseYourProject";
@@ -262,6 +264,9 @@ export default function ScreenManager() {
   // Persist last visible screen so reopening the plugin window resumes the same UI (projects vs chat).
   useEffect(() => {
     try {
+      // Never persist "SignIn" as last step automatically; it can create sticky loops.
+      // If user intentionally wants to stay on Sign In, we use PIN_SIGNIN_KEY instead.
+      if (currentStep === "SignIn") return;
       safeSetItem(LAST_STEP_KEY, currentStep);
     } catch {
       // best-effort

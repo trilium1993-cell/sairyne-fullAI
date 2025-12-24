@@ -419,6 +419,41 @@ export function openUrlInSystemBrowser(url: string): void {
 }
 
 /**
+ * Expand/collapse plugin window (Visual Tips / Analysis side panel).
+ * Works in direct-load WebView mode (no wrapper) and falls back to old wrapper postMessage.
+ */
+export function setPluginExpanded(expanded: boolean): void {
+  const v = expanded ? '1' : '0';
+
+  // Preferred: JUCE native event listener (direct-load WKWebView)
+  if (tryEmitNativeEvent('sairyneResize', { expanded: Number(v) })) {
+    return;
+  }
+
+  // Fallback 1: wrapper postMessage (legacy)
+  try {
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(`sairyne:resize:${v}`, '*');
+      return;
+    }
+  } catch {}
+
+  // Fallback 2: custom scheme navigation (some hosts intercept this)
+  try {
+    const url = `sairyne://expanded=${v}`;
+    if (typeof window !== 'undefined') {
+      if (window.top && window.top !== window) {
+        window.top.location.href = url;
+      } else if (window.parent && window.parent !== window) {
+        window.parent.location.href = url;
+      } else if (window.location) {
+        window.location.href = url;
+      }
+    }
+  } catch {}
+}
+
+/**
  * Сохранить данные в JUCE PropertiesFile
  * Uses postMessage only - no location.href
  */
@@ -575,7 +610,14 @@ if (typeof window !== 'undefined') {
       try {
         Object.entries(data).forEach(([key, value]) => {
           // IMPORTANT: runtime boot id must be runtime-only, never cached across host restarts.
-          if (key === 'sairyne_runtime_boot_id') return;
+          if (
+            key === 'sairyne_runtime_boot_id' ||
+            key === 'sairyne_os_boot_id' ||
+            key === 'sairyne_ui_last_step' ||
+            key === 'sairyne_ui_pin_signin'
+          ) {
+            return;
+          }
           window.localStorage.setItem(key, value);
         });
         console.log('[JUCE Bridge] ✅ Saved', Object.keys(data).length, 'keys to localStorage cache');

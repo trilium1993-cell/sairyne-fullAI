@@ -23,6 +23,7 @@ import { getSelectedProject } from "../../services/projects";
 import { getActiveUserEmail } from "../../services/auth";
 import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
 import { safeJsonParse } from "../../utils/safeJson";
+import { setPluginExpanded } from "../../services/audio/juceBridge";
 
 const SEND_ICON = "https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg";
 const ANALYSIS_ICON = "https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg";
@@ -983,11 +984,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Notify host (JUCE wrapper) about expanded state for Visual Tips / Analysis
   useEffect(() => {
-    const expanded = (showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary) ? '1' : '0';
     try {
-      if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
-        window.parent.postMessage(`sairyne:resize:${expanded}`, '*');
-      }
+      setPluginExpanded(Boolean(showVisualTips || showProjectAnalysis || showAnalysingChannels || showAnalysisSummary));
     } catch {}
   }, [showVisualTips, showProjectAnalysis, showAnalysingChannels, showAnalysisSummary]);
 
