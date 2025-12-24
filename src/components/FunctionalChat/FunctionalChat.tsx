@@ -170,6 +170,7 @@ interface FunctionalChatProps {
 
 export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
   const [userInput, setUserInput] = useState("");
@@ -215,6 +216,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   
   // Сохранение состояния для каждого режима
   interface ModeState {
@@ -449,6 +454,17 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const onDataLoaded = (e: any) => {
       const key = e?.detail?.key;
       if (key === CHAT_STATE_KEY || key === 'sairyne_selected_project' || key === 'sairyne_projects') {
+        // IMPORTANT: avoid clobbering in-flight UI messages.
+        // We only need to rehydrate on initial JUCE inject / project switching, not on every local safeSetItem write.
+        if (
+          key === CHAT_STATE_KEY &&
+          isInitializedRef.current &&
+          messagesRef.current.length > 0 &&
+          !expectingHydrationRef.current
+        ) {
+          return;
+        }
+
         // If selected project changed, reset to blank BEFORE hydrating.
         const nextSessionKey = resolveActiveSessionKey();
         setIsProjectSessionReady(Boolean(nextSessionKey));
@@ -461,7 +477,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         // Only hydrate when we have a project session key.
         if (nextSessionKey) {
           const ok = tryHydrateFromStorage();
-          if (ok) setIsHydrationGateReady(true);
+          if (ok) {
+            expectingHydrationRef.current = false;
+            setIsHydrationGateReady(true);
+          }
         }
           // If we are expecting hydration (persisted messages exist), keep the gate closed
           // until hydration succeeds. This prevents "first prompt" flicker.
