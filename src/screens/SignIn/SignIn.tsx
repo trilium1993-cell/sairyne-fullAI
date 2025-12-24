@@ -228,9 +228,9 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
   };
 
   const handleSignUp = () => {
-    // Open website registration/sign-in flow in system browser (plugin-safe).
-    // This avoids embedding registration inside the plugin WebView.
-    openUrlInSystemBrowser('https://www.sairyne.net/sign-in');
+    // Open registration in the system browser (plugin-safe).
+    // IMPORTANT: use the website registration page (external), just like "Forgot password".
+    openUrlInSystemBrowser('https://www.sairyne.net/register');
   };
 
   const closeError = () => {
