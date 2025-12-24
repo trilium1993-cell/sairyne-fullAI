@@ -515,10 +515,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!isProjectSessionReady) return;
     if (resumeAttemptedRef.current[sessionKey]) return;
 
-    // Only attempt if we currently have a thinking message restored.
-    const hasThinking = messages.some((m) => (m as any).isThinking);
-    if (!hasThinking) return;
-
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
       if (!raw) return;
@@ -531,6 +527,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       const messageText = String(pending.messageText);
       const mode = pending.mode as 'pro' | 'create' | 'learn';
+
+      // Ensure a thinking indicator exists in the restored UI.
+      const hasThinking = messages.some((m) => (m as any).isThinking);
+      if (!hasThinking) {
+        setMessages((prev) => [
+          ...prev,
+          { id: String(pending.thinkingId || `ai-thinking-${Date.now()}`), type: 'ai', content: '...', timestamp: Date.now(), isThinking: true } as any,
+        ]);
+      }
 
       // Rebuild conversation history from restored messages (excluding thinking).
       const conversationHistory = messages
@@ -607,7 +612,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         if (!root || typeof root !== 'object') root = {};
         if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
         root.v = 2;
-        root.sessions[sessionKey] = sessionPayload;
+        // Preserve transient per-session metadata (e.g. pending AI request) across normal state saves.
+        const prevSession = root.sessions[sessionKey];
+        const pendingAi = prevSession && typeof prevSession === 'object' ? (prevSession as any).pendingAi : undefined;
+        root.sessions[sessionKey] = pendingAi ? { ...sessionPayload, pendingAi } : sessionPayload;
         root.savedAt = Date.now();
 
         safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
@@ -1135,6 +1143,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!isProjectSessionReady) return;
     // Wait until hydration gate is ready (avoids flashing first prompt before persisted messages load)
     if (!isHydrationGateReady) return;
+    // If we still can't determine whether persisted messages exist for this session, do not show the prompt.
+    // This avoids the "flash then disappear" when chat state arrives slightly later.
+    try {
+      const sessionKey = resolveActiveSessionKey();
+      const hasPersisted = hasPersistedMessagesForSession(sessionKey);
+      if (hasPersisted === null) return;
+      if (hasPersisted === true) return;
+    } catch {}
     // Only send the first workflow prompt if there is truly no restored chat state.
     if (!isInitializedRef.current && messages.length === 0) {
       isInitializedRef.current = true;
