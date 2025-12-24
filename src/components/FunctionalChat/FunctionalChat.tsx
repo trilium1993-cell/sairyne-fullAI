@@ -171,8 +171,9 @@ interface FunctionalChatProps {
 export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Element => {
   const [messages, setMessages] = useState<Message[]>([]);
   const messagesRef = useRef<Message[]>([]);
-  const sendLockRef = useRef(false);
   const lastSendAtRef = useRef(0);
+  const aiRequestInFlightRef = useRef(false);
+  const learnAnalysisSeqRef = useRef(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
   const [userInput, setUserInput] = useState("");
@@ -834,15 +835,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const handleSendMessage = async () => {
     // Guard against double-trigger (Enter + click, key repeat, WKWebView duplicate keydown)
     const now = Date.now();
-    if (sendLockRef.current && now - lastSendAtRef.current < 800) {
+    if (now - lastSendAtRef.current < 900) {
       return;
     }
-    sendLockRef.current = true;
     lastSendAtRef.current = now;
-    // Always release the lock shortly after; prevents accidental double-send without blocking normal typing.
-    window.setTimeout(() => {
-      sendLockRef.current = false;
-    }, 350);
+    // Any new user send should invalidate a pending Learn-mode context analysis response.
+    learnAnalysisSeqRef.current += 1;
 
     if (!userInput.trim()) {
       console.log('[FunctionalChat] handleSendMessage: Empty input, ignoring');
@@ -870,6 +868,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     
     if (shouldUseAI) {
       console.log('[FunctionalChat] AI Mode: Processing message', { isProMode, isCreateMode, isLearnModeAI });
+      // Prevent concurrent AI requests from stacking (can cause multiple responses).
+      if (aiRequestInFlightRef.current) {
+        return;
+      }
+      aiRequestInFlightRef.current = true;
       setShowOptions(false);
       setShowGenres(false);
       setShowReadyButton(false);
@@ -974,6 +977,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         ChatService.sendMessage(messageText, conversationHistory, aiMode)
           .then(aiResponse => {
             console.log('[FunctionalChat] Pro Mode: Received AI response, length:', aiResponse?.length || 0);
+            aiRequestInFlightRef.current = false;
             
             // Удаляем индикатор "думает"
             setMessages(prevMsgs => {
@@ -1008,6 +1012,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           })
           .catch(error => {
             console.error('[FunctionalChat] Pro Mode: AI chat error:', error);
+            aiRequestInFlightRef.current = false;
             // Удаляем индикатор "думает"
             setMessages(prevMsgs => prevMsgs.filter(msg => !msg.isThinking));
             // Показываем сообщение об ошибке
@@ -1692,6 +1697,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   // Активируем AI диалог в Learn mode (остаёмся в Learn, но включаем AI)
                   setLearnModeAIActive(true);
                   console.log('[Learn Mode → AI Analysis] Activated AI in Learn Mode');
+
+                  // Track this analysis request so we can ignore stale responses.
+                  const seq = ++learnAnalysisSeqRef.current;
                   
                   // Собираем контекст Learn mode
                   const learnContext = messages
@@ -1704,11 +1712,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   // Отправляем контекст в backend для анализа
                   ChatService.analyzeLearnModeContext(learnContext)
                     .then(aiResponse => {
+                      if (seq !== learnAnalysisSeqRef.current) return;
                       console.log('[Learn Mode → AI Analysis] Received analysis:', aiResponse.substring(0, 100) + '...');
                       // AI анализирует контекст и предлагает продолжение
                       addAIMessage(aiResponse);
                     })
                     .catch(error => {
+                      if (seq !== learnAnalysisSeqRef.current) return;
                       console.error('[Learn Mode → AI Analysis] Error:', error);
                       addAIMessage("Let's continue building your track! What would you like to work on next?");
                     });
