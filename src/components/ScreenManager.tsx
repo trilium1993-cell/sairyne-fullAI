@@ -14,6 +14,7 @@ export default function ScreenManager() {
   const authedSinceRef = useRef<number | null>(null);
   const forceProjectsRef = useRef(false);
   const LAST_STEP_KEY = "sairyne_ui_last_step";
+  const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
   const cachedOsBootIdRef = useRef<string | null>(null);
 
   // Capture the cached OS boot id (localStorage) on first mount, before JUCE inject overwrites it.
@@ -48,11 +49,11 @@ export default function ScreenManager() {
 
     if (!isAuthed) return "SignIn";
 
-    // If user explicitly chose to stay on Sign In (e.g. switching accounts), respect it.
-    const lastUiStep = safeGetItem(LAST_STEP_KEY);
-    if (lastUiStep === "SignIn") {
-      return "SignIn";
-    }
+    // If user explicitly pinned Sign In (e.g. switching accounts), respect it.
+    // IMPORTANT: do NOT treat LAST_STEP_KEY === "SignIn" as a pin, because the app
+    // starts on SignIn before JUCE data arrives and would create a permanent loop.
+    const pinnedSignIn = safeGetItem(PIN_SIGNIN_KEY);
+    if (pinnedSignIn === "1") return "SignIn";
 
     // Computer reboot detection:
     // If OS boot changed, require password again (but keep draft email).
@@ -85,6 +86,7 @@ export default function ScreenManager() {
 
     // Same DAW session (no host restart): resume last screen when reopening the plugin window.
     // If last screen was chat, keep user in chat; if it was projects, stay on projects.
+    const lastUiStep = safeGetItem(LAST_STEP_KEY);
     if (lastUiStep === "ChooseYourProject") {
       return "ChooseYourProject";
     }
@@ -111,12 +113,11 @@ export default function ScreenManager() {
         authedSinceRef.current = null;
       }
 
-      // If the last saved UI step is SignIn, it must override anything else.
-      // Important: we may initially route to Projects before this key arrives from JUCE,
-      // and then our "stay on projects" guard would prevent correction. So handle it early.
+      // If user pinned Sign In, it must override anything else.
+      // This is different from LAST_STEP_KEY === "SignIn" (which can be a transient initial state).
       if (isAuthed) {
-        const lastUiStep = safeGetItem(LAST_STEP_KEY);
-        if (lastUiStep === "SignIn") {
+        const pinnedSignIn = safeGetItem(PIN_SIGNIN_KEY);
+        if (pinnedSignIn === "1") {
           manualStayOnSignInRef.current = true;
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;
@@ -277,6 +278,8 @@ export default function ScreenManager() {
       }
       if (currentStep === "SignIn") {
         manualStayOnSignInRef.current = false;
+        // Leaving Sign In via normal flow means "unpinned".
+        safeRemoveItem(PIN_SIGNIN_KEY);
       }
       setHistory(prev => [...prev, currentStep]);
       setCurrentStep(nextStep);
@@ -302,6 +305,7 @@ export default function ScreenManager() {
       setHistory([]);
       setCurrentStep("SignIn");
       manualStayOnSignInRef.current = true;
+      safeSetItem(PIN_SIGNIN_KEY, "1");
       return;
     }
 
