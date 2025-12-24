@@ -211,6 +211,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Prevent the "first workflow prompt" from flashing before persisted state is hydrated.
   const [isHydrationGateReady, setIsHydrationGateReady] = useState(false);
   const hydrationTimerRef = useRef<number | null>(null);
+  const expectingHydrationRef = useRef(false);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
@@ -245,6 +246,29 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   };
 
   const lastSessionKeyRef = useRef<string | null>(null);
+  const hasPersistedMessagesForSession = useCallback((sessionKey: string | null): boolean | null => {
+    if (!sessionKey) return null;
+    try {
+      const raw = safeGetItem(CHAT_STATE_KEY);
+      if (!raw) return null; // unknown (may still be loading from JUCE)
+      const parsed = safeJsonParse<any>(raw, null);
+      if (!parsed || typeof parsed !== 'object') return false;
+      const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
+      if (!hasSessions) return false;
+      const session = parsed.sessions?.[sessionKey];
+      if (!session || typeof session !== 'object') return false;
+      const modeStates = session.modeStates;
+      if (!modeStates || typeof modeStates !== 'object') return false;
+      const any =
+        (Array.isArray(modeStates.learn?.messages) && modeStates.learn.messages.length > 0) ||
+        (Array.isArray(modeStates.create?.messages) && modeStates.create.messages.length > 0) ||
+        (Array.isArray(modeStates.pro?.messages) && modeStates.pro.messages.length > 0);
+      return any;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const startHydrationGate = useCallback((sessionKey: string | null) => {
     if (hydrationTimerRef.current) {
       window.clearTimeout(hydrationTimerRef.current);
@@ -253,14 +277,26 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     // If no session key (no project selected), keep gate closed.
     if (!sessionKey) {
       setIsHydrationGateReady(false);
+      expectingHydrationRef.current = false;
       return;
     }
-    // Close gate and reopen after a short window to allow JUCE-injected chat state to arrive.
+    // Deterministic gate:
+    // - If we already know there are persisted messages for this session, DO NOT open by timeout.
+    //   Wait until hydration succeeds (prevents "flash then disappear").
+    // - If we know there are no messages, open quickly.
+    // - If unknown (chat state not loaded yet), wait a bit longer for JUCE to inject; then open.
+    const hasPersisted = hasPersistedMessagesForSession(sessionKey);
     setIsHydrationGateReady(false);
+    if (hasPersisted === true) {
+      expectingHydrationRef.current = true;
+      return;
+    }
+    expectingHydrationRef.current = false;
+    const waitMs = hasPersisted === false ? 150 : 2800;
     hydrationTimerRef.current = window.setTimeout(() => {
       setIsHydrationGateReady(true);
-    }, 900);
-  }, []);
+    }, waitMs);
+  }, [hasPersistedMessagesForSession]);
 
   const resetUiToBlankSession = useCallback(() => {
     // Reset in-memory UI state so switching projects doesn't reuse previous project's chat
@@ -427,6 +463,17 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           const ok = tryHydrateFromStorage();
           if (ok) setIsHydrationGateReady(true);
         }
+          // If we are expecting hydration (persisted messages exist), keep the gate closed
+          // until hydration succeeds. This prevents "first prompt" flicker.
+          if (nextSessionKey && expectingHydrationRef.current) {
+            const hasPersisted = hasPersistedMessagesForSession(nextSessionKey);
+            if (hasPersisted === true) {
+              setIsHydrationGateReady(false);
+            } else if (hasPersisted === false) {
+              expectingHydrationRef.current = false;
+              setIsHydrationGateReady(true);
+            }
+          }
         // Also refresh project name when selected project data arrives late
         const selectedProject = getSelectedProject();
         if (selectedProject?.name) {
@@ -459,6 +506,67 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
     };
   }, []); // Только при монтировании
+
+  // Resume AI requests that were in-flight when the plugin UI was closed.
+  const resumeAttemptedRef = useRef<Record<string, boolean>>({});
+  useEffect(() => {
+    const sessionKey = resolveActiveSessionKey();
+    if (!sessionKey) return;
+    if (!isProjectSessionReady) return;
+    if (resumeAttemptedRef.current[sessionKey]) return;
+
+    // Only attempt if we currently have a thinking message restored.
+    const hasThinking = messages.some((m) => (m as any).isThinking);
+    if (!hasThinking) return;
+
+    try {
+      const raw = safeGetItem(CHAT_STATE_KEY);
+      if (!raw) return;
+      const root = safeJsonParse<any>(raw, null);
+      const pending = root?.sessions?.[sessionKey]?.pendingAi;
+      if (!pending || typeof pending.messageText !== 'string' || typeof pending.mode !== 'string') return;
+
+      // Mark attempt so we don't loop.
+      resumeAttemptedRef.current[sessionKey] = true;
+
+      const messageText = String(pending.messageText);
+      const mode = pending.mode as 'pro' | 'create' | 'learn';
+
+      // Rebuild conversation history from restored messages (excluding thinking).
+      const conversationHistory = messages
+        .filter((msg) => {
+          const isValid = !(msg as any).isThinking && !(msg as any).isTyping && msg.content.trim() !== '';
+          const isNotSystem = msg.content !== "Completed. Next step." && !msg.content.includes("Completed.");
+          return isValid && isNotSystem;
+        })
+        .map((msg) => ({ type: msg.type, content: msg.content }));
+
+      ChatService.sendMessage(messageText, conversationHistory, mode)
+        .then((aiResponse) => {
+          // Remove thinking
+          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
+          // Clear pending marker
+          try {
+            const existing = safeGetItem(CHAT_STATE_KEY);
+            if (existing) {
+              const root2 = safeJsonParse<any>(existing, {}) || {};
+              if (root2?.sessions?.[sessionKey]) {
+                delete root2.sessions[sessionKey].pendingAi;
+                safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
+              }
+            }
+          } catch {}
+          addAIMessage(aiResponse);
+        })
+        .catch(() => {
+          // Keep the thinking message removed but show a retry hint.
+          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
+          addAIMessage("Your previous request was interrupted when the plugin was closed. Please try sending again.");
+        });
+    } catch {
+      // ignore
+    }
+  }, [isProjectSessionReady, messages, selectedLearnLevel]);
 
   // Persist chat state (debounced) so AU/VST3 window reload doesn't wipe it
   useEffect(() => {
@@ -742,7 +850,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // Показываем индикатор "AI думает"
       const thinkingId = Date.now().toString();
       
-      // Добавляем сообщение пользователя И thinking сообщение в одном обновлении состояния
+      // Add user message + thinking message in one state update, and persist a "pending AI request"
+      // so reopening the plugin mid-request can resume/retry automatically.
       setMessages(prev => {
         // Создаем сообщение пользователя
         const userMessage: Message = {
@@ -797,6 +906,29 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           aiMode = 'learn';
         }
         
+        // Persist pending AI request for this project session (best-effort).
+        try {
+          const sessionKey = resolveActiveSessionKey();
+          if (sessionKey) {
+            let root: any = {};
+            const existing = safeGetItem(CHAT_STATE_KEY);
+            if (existing) root = safeJsonParse<any>(existing, {}) || {};
+            if (!root || typeof root !== 'object') root = {};
+            if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
+            if (!root.sessions[sessionKey] || typeof root.sessions[sessionKey] !== 'object') {
+              root.sessions[sessionKey] = {};
+            }
+            root.sessions[sessionKey].pendingAi = {
+              v: 1,
+              messageText,
+              mode: aiMode,
+              startedAt: Date.now(),
+              thinkingId,
+            };
+            safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+          }
+        } catch {}
+
         // Отправляем запрос асинхронно
         ChatService.sendMessage(messageText, conversationHistory, aiMode)
           .then(aiResponse => {
@@ -808,6 +940,21 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               console.log('[FunctionalChat] Pro Mode: Removed thinking message, remaining messages:', filtered.length);
               return filtered;
             });
+
+            // Clear pending AI request marker (best-effort).
+            try {
+              const sessionKey = resolveActiveSessionKey();
+              if (sessionKey) {
+                const existing = safeGetItem(CHAT_STATE_KEY);
+                if (existing) {
+                  const root = safeJsonParse<any>(existing, {}) || {};
+                  if (root?.sessions?.[sessionKey]) {
+                    delete root.sessions[sessionKey].pendingAi;
+                    safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+                  }
+                }
+              }
+            } catch {}
             
             // Добавляем ответ AI с анимацией печатания
             addAIMessage(aiResponse);
@@ -824,6 +971,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             setMessages(prevMsgs => prevMsgs.filter(msg => !msg.isThinking));
             // Показываем сообщение об ошибке
             addAIMessage("Sorry, I couldn't process your request. Please try again.");
+            // Keep pendingAi so user can retry on reopen (or we can auto-retry later).
           });
         
         return newMessages;
