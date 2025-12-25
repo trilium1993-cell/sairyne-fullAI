@@ -1,4 +1,7 @@
 import { API_ENDPOINTS, getApiUrl } from '../config/api';
+import { getOrCreateInstallId } from './installId';
+import { getSelectedProject } from './projects';
+import { getActiveUserEmail } from './auth';
 
 interface ChatMessage {
   type: 'user' | 'ai';
@@ -76,6 +79,8 @@ export class ChatService {
   ): Promise<string> {
     const isDev = import.meta.env.DEV;
     const url = getApiUrl(API_ENDPOINTS.CHAT_MESSAGE);
+    const selectedProject = getSelectedProject();
+    const installId = getOrCreateInstallId();
     
     if (isDev) {
       console.debug('[chat] POST', url, 'mode:', mode);
@@ -93,7 +98,14 @@ export class ChatService {
             body: JSON.stringify({
               message,
               conversationHistory: conversationHistory.slice(-10), // Last 10 messages for context
-              mode // Pass the mode to backend for proper prompt selection
+              mode, // Pass the mode to backend for proper prompt selection
+              client: {
+                installId,
+                ownerEmail: selectedProject?.ownerEmail || getActiveUserEmail(),
+                projectId: selectedProject?.id ?? null,
+                source: 'plugin',
+                ts: Date.now(),
+              },
             }),
           },
           30000 // 30 second timeout
@@ -129,6 +141,8 @@ export class ChatService {
   static async analyzeLearnModeContext(learnContext: ChatMessage[]): Promise<string> {
     const isDev = import.meta.env.DEV;
     const url = getApiUrl('/api/chat/analyze-learn-context');
+    const selectedProject = getSelectedProject();
+    const installId = getOrCreateInstallId();
     
     if (isDev) {
       console.debug('[chat] POST analyze-learn-context', url);
@@ -144,7 +158,14 @@ export class ChatService {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              learnContext
+              learnContext,
+              client: {
+                installId,
+                ownerEmail: selectedProject?.ownerEmail || getActiveUserEmail(),
+                projectId: selectedProject?.id ?? null,
+                source: 'plugin',
+                ts: Date.now(),
+              },
             }),
           },
           30000 // 30 second timeout
