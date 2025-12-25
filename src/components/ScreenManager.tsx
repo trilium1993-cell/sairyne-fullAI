@@ -60,6 +60,14 @@ export default function ScreenManager() {
     const osBootId = safeGetItem("sairyne_os_boot_id");
     const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
     const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
+
+    // Guard against "flash SignIn then jump to Projects":
+    // If we have ANY previous OS boot id but the current osBootId hasn't arrived yet,
+    // do not auto-route away from Sign In. We'll re-run this once JUCE inject arrives.
+    if (!osBootId && previousOsBootId) {
+      return "SignIn";
+    }
+
     if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
       safeRemoveItem("sairyne_access_token");
       safeRemoveItem("sairyne_current_user");
@@ -139,11 +147,10 @@ export default function ScreenManager() {
         const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
         const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
 
-        // If we have a stored last-os-boot-id but the current os-boot-id hasn't arrived yet,
-        // wait briefly to avoid routing to Projects and getting stuck there.
-        if (!osBootId && (lastOsBootId || cachedOsBootIdRef.current)) {
-          const waitedMs = Date.now() - (authedSinceRef.current || Date.now());
-          if (waitedMs < 2500) return;
+        // If we have ANY previous OS boot id but current osBootId hasn't arrived yet,
+        // never auto-route (prevents SignIn -> Projects flip after reboot timing races).
+        if (!osBootId && previousOsBootId) {
+          return;
         }
 
         if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
