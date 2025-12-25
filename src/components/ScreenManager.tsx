@@ -17,6 +17,19 @@ export default function ScreenManager() {
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
   const cachedOsBootIdRef = useRef<string | null>(null);
 
+  const clearAuthAndProject = (nextOsBootId?: string) => {
+    try {
+      safeRemoveItem("sairyne_access_token");
+      safeRemoveItem("sairyne_current_user");
+      safeRemoveItem("sairyne_selected_project");
+      if (nextOsBootId) {
+        safeSetItem("sairyne_last_os_boot_id", nextOsBootId);
+      }
+    } catch {
+      // best-effort
+    }
+  };
+
   // Capture the cached OS boot id (localStorage) on first mount, before JUCE inject overwrites it.
   // This lets us detect OS reboot even if `sairyne_last_os_boot_id` wasn't present for some reason.
   useEffect(() => {
@@ -55,32 +68,26 @@ export default function ScreenManager() {
     const pinnedSignIn = safeGetItem(PIN_SIGNIN_KEY);
     if (pinnedSignIn === "1") return "SignIn";
 
-    // Computer reboot detection:
-    // If OS boot changed, require password again (but keep draft email).
+    // Computer reboot logic (STRICT):
+    // After an OS reboot we must always require password again.
+    // We only allow auto-start into Projects when:
+    //   osBootId is loaded AND lastOsBootId exists AND they match.
     const osBootId = safeGetItem("sairyne_os_boot_id");
     const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
     const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
 
-    // Guard against "flash SignIn then jump to Projects":
-    // If we have ANY previous OS boot id but the current osBootId hasn't arrived yet,
-    // do not auto-route away from Sign In. We'll re-run this once JUCE inject arrives.
-    if (!osBootId && previousOsBootId) {
+    // If we can't verify the OS boot id yet, never auto-route away from Sign In.
+    if (!osBootId) return "SignIn";
+
+    // If we have no baseline to compare against, be conservative: sign out and require login.
+    if (!previousOsBootId) {
+      clearAuthAndProject(osBootId);
       return "SignIn";
     }
 
-    // If OS boot id arrived but we don't yet have a baseline to compare against,
-    // be conservative and stay on Sign In until the baseline is loaded from JUCE.
-    // (Important: do NOT write `sairyne_last_os_boot_id` here — it may not have been loaded yet.)
-    if (osBootId && !previousOsBootId) {
-      return "SignIn";
-    }
-
-    if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
-      safeRemoveItem("sairyne_access_token");
-      safeRemoveItem("sairyne_current_user");
-      safeRemoveItem("sairyne_selected_project");
-      // Update last-os-boot so we don't repeatedly trigger after we route to SignIn.
-      safeSetItem("sairyne_last_os_boot_id", osBootId);
+    // Reboot detected -> clear auth and require login.
+    if (osBootId !== previousOsBootId) {
+      clearAuthAndProject(osBootId);
       return "SignIn";
     }
 
@@ -143,30 +150,38 @@ export default function ScreenManager() {
         }
       }
 
-      // OS reboot detection must run even if we previously "locked" the UI on Projects.
-      // Otherwise, a late-arriving os_boot_id would never be able to force Sign In.
+      // OS reboot gate (STRICT):
+      // If we're "authed" but can't confirm we're in the same OS boot, do NOT allow any
+      // fallback that would push us into Projects. After OS reboot we must require login.
       if (isAuthed) {
         const osBootId = safeGetItem("sairyne_os_boot_id");
         const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
         const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
 
-        // If we have ANY previous OS boot id but current osBootId hasn't arrived yet,
-        // never auto-route (prevents SignIn -> Projects flip after reboot timing races).
-        if (!osBootId && previousOsBootId) {
+        // If os boot id hasn't arrived yet, hold on Sign In and wait.
+        if (!osBootId) {
+          if (currentStep !== "SignIn") {
+            setHistory([]);
+            setCurrentStep("SignIn");
+          }
           return;
         }
 
-        // If OS boot id arrived but the baseline hasn't loaded yet, do nothing yet.
-        // This prevents a reboot from "jumping" to Projects before we can compare.
-        if (osBootId && !previousOsBootId) {
+        // No baseline -> sign out and require login.
+        if (!previousOsBootId) {
+          clearAuthAndProject(osBootId);
+          forceProjectsRef.current = false;
+          manualStayOnProjectsRef.current = false;
+          manualStayOnSignInRef.current = false;
+          bootHandledRef.current = true;
+          setHistory([]);
+          setCurrentStep("SignIn");
           return;
         }
 
-        if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
-          safeRemoveItem("sairyne_access_token");
-          safeRemoveItem("sairyne_current_user");
-          safeRemoveItem("sairyne_selected_project");
-          safeSetItem("sairyne_last_os_boot_id", osBootId);
+        // Reboot detected -> sign out and require login.
+        if (osBootId !== previousOsBootId) {
+          clearAuthAndProject(osBootId);
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;
           manualStayOnSignInRef.current = false;
