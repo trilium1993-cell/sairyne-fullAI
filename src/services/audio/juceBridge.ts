@@ -539,6 +539,10 @@ export function onDataLoaded(callback: (payload: { key: string; value: string })
   // Set up global handler (will be called by C++ executeJavaScript)
   (window as any).onJuceDataLoaded = (key: string, value: string) => {
     console.log('[JUCE Bridge] 📥 onJuceDataLoaded called:', key, value ? `value length: ${value.length}` : 'empty');
+    // NOTE: In our JUCE PropertiesFile bridge, "missing key" often results in an empty string.
+    // We must still notify JS listeners, otherwise the app can't distinguish "still loading"
+    // from "missing", causing race conditions in boot/auth routing.
+    const normalized = value && value.length > 0 ? value : '0';
     
     // Clear pending flag (data received, even if empty)
     if (typeof window !== 'undefined' && (window as any).__sairynePendingLoads) {
@@ -546,21 +550,17 @@ export function onDataLoaded(callback: (payload: { key: string; value: string })
       console.log('[JUCE Bridge] ✅ Cleared pending flag for:', key);
     }
     
-    // Store in memory storage and window.__sairyneStorage
-    if (value && value.length > 0) {
-      if (typeof window !== 'undefined') {
-        // Store in window.__sairyneStorage (which storage.ts syncs from)
-        if (!(window as any).__sairyneStorage) {
-          (window as any).__sairyneStorage = new Map();
-        }
-        (window as any).__sairyneStorage.set(key, value);
-        console.log('[JUCE Bridge] ✅ Stored in __sairyneStorage:', key);
+    // Store in memory storage and window.__sairyneStorage (even if missing/empty -> tombstone)
+    if (typeof window !== 'undefined') {
+      // Store in window.__sairyneStorage (which storage.ts syncs from)
+      if (!(window as any).__sairyneStorage) {
+        (window as any).__sairyneStorage = new Map();
       }
-      
-      callback({ key, value });
-    } else {
-      console.log('[JUCE Bridge] ⚠️ Empty value received for key:', key, '- not calling callback');
+      (window as any).__sairyneStorage.set(key, normalized);
+      console.log('[JUCE Bridge] ✅ Stored in __sairyneStorage:', key, normalized === '0' ? '(tombstone)' : '');
     }
+    
+    callback({ key, value: normalized });
   };
 
   return () => {

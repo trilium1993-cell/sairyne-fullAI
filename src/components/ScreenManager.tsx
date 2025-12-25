@@ -7,6 +7,7 @@ import { getSelectedProject } from "../services/projects";
 export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
   const [history, setHistory] = useState<Step[]>([]);
+  const [isOsGatePending, setIsOsGatePending] = useState(false);
   const lastAutoStepRef = useRef<Step | null>(null);
   const manualStayOnProjectsRef = useRef(false);
   const manualStayOnSignInRef = useRef(false);
@@ -70,8 +71,10 @@ export default function ScreenManager() {
     // If we can't verify the OS boot id yet, never auto-route away from Sign In.
     if (!osBootId) return "SignIn";
 
-    // If we have no baseline to compare against, be conservative: sign out and require login.
-    if (!lastOsBootId) {
+    // If baseline hasn't loaded yet (JUCE may inject it async), wait. Do NOT clear auth here.
+    if (lastOsBootId == null) return "SignIn";
+    // If baseline is explicitly missing (tombstone), require login and establish baseline.
+    if (lastOsBootId === TOMBSTONE) {
       clearAuthAndProject(osBootId);
       return "SignIn";
     }
@@ -150,6 +153,7 @@ export default function ScreenManager() {
 
         // If os boot id hasn't arrived yet, hold on Sign In and wait.
         if (!osBootId) {
+          setIsOsGatePending(true);
           if (currentStep !== "SignIn") {
             setHistory([]);
             setCurrentStep("SignIn");
@@ -157,8 +161,23 @@ export default function ScreenManager() {
           return;
         }
 
-        // No baseline -> sign out and require login.
-        if (!lastOsBootId) {
+        // Baseline not loaded yet -> request it and wait (do NOT clear auth).
+        if (lastOsBootId == null) {
+          setIsOsGatePending(true);
+          try {
+            if (typeof window !== "undefined" && (window as any).loadFromJuce) {
+              (window as any).loadFromJuce("sairyne_last_os_boot_id");
+            }
+          } catch {}
+          if (currentStep !== "SignIn") {
+            setHistory([]);
+            setCurrentStep("SignIn");
+          }
+          return;
+        }
+
+        // Baseline explicitly missing -> sign out and require login.
+        if (lastOsBootId === TOMBSTONE) {
           clearAuthAndProject(osBootId);
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;
@@ -166,6 +185,7 @@ export default function ScreenManager() {
           bootHandledRef.current = true;
           setHistory([]);
           setCurrentStep("SignIn");
+          setIsOsGatePending(false);
           return;
         }
 
@@ -178,8 +198,12 @@ export default function ScreenManager() {
           bootHandledRef.current = true;
           setHistory([]);
           setCurrentStep("SignIn");
+          setIsOsGatePending(false);
           return;
         }
+
+        // Gate passed
+        setIsOsGatePending(false);
       }
 
       // Hard lock: if we decided "stay on projects" (e.g. after host restart),
@@ -362,7 +386,13 @@ export default function ScreenManager() {
       alignItems: 'center',
       justifyContent: 'center'
     }}>
-      <ScreenComponent onNext={onNext} onBack={onBack} />
+      {isOsGatePending ? (
+        <div style={{ color: "#ffffffb3", fontFamily: "system-ui, -apple-system, sans-serif", fontSize: 14 }}>
+          Loading…
+        </div>
+      ) : (
+        <ScreenComponent onNext={onNext} onBack={onBack} />
+      )}
     </div>
   );
 }
