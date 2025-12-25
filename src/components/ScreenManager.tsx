@@ -68,6 +68,13 @@ export default function ScreenManager() {
       return "SignIn";
     }
 
+    // If OS boot id arrived but we don't yet have a baseline to compare against,
+    // be conservative and stay on Sign In until the baseline is loaded from JUCE.
+    // (Important: do NOT write `sairyne_last_os_boot_id` here — it may not have been loaded yet.)
+    if (osBootId && !previousOsBootId) {
+      return "SignIn";
+    }
+
     if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
       safeRemoveItem("sairyne_access_token");
       safeRemoveItem("sairyne_current_user");
@@ -75,10 +82,6 @@ export default function ScreenManager() {
       // Update last-os-boot so we don't repeatedly trigger after we route to SignIn.
       safeSetItem("sairyne_last_os_boot_id", osBootId);
       return "SignIn";
-    }
-    // Ensure we always have a baseline for next OS reboot.
-    if (osBootId && !lastOsBootId) {
-      safeSetItem("sairyne_last_os_boot_id", osBootId);
     }
 
     // Host boot detection:
@@ -153,6 +156,12 @@ export default function ScreenManager() {
           return;
         }
 
+        // If OS boot id arrived but the baseline hasn't loaded yet, do nothing yet.
+        // This prevents a reboot from "jumping" to Projects before we can compare.
+        if (osBootId && !previousOsBootId) {
+          return;
+        }
+
         if (osBootId && previousOsBootId && osBootId !== previousOsBootId) {
           safeRemoveItem("sairyne_access_token");
           safeRemoveItem("sairyne_current_user");
@@ -165,9 +174,6 @@ export default function ScreenManager() {
           setHistory([]);
           setCurrentStep("SignIn");
           return;
-        }
-        if (osBootId && !lastOsBootId) {
-          safeSetItem("sairyne_last_os_boot_id", osBootId);
         }
       }
 

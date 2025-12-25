@@ -238,13 +238,11 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
 
         <button
           onClick={() => setShowBackToSignIn(true)}
-          className="absolute top-[23px] left-[12px] w-8 h-8 flex items-center justify-center hover:opacity-80 transition-opacity"
+          className="absolute top-[23px] right-[12px] h-7 px-3 rounded-md border border-solid border-[#ff4d4d66] bg-[#ff00001a] text-[#ff9b9b] text-[11px] font-medium hover:bg-[#ff00002b] hover:border-[#ff4d4dcc] transition-colors"
           aria-label="Back to Sign In"
           type="button"
         >
-          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          Sign out
         </button>
 
         <h2 className="absolute top-[25px] left-[calc(50.00%_-_146px)] font-h2 font-[number:var(--h2-font-weight)] text-[#f7efff] text-[length:var(--h2-font-size)] tracking-[var(--h2-letter-spacing)] leading-[var(--h2-line-height)] [font-style:var(--h2-font-style)]">
