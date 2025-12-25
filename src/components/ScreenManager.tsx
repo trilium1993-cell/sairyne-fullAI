@@ -15,7 +15,6 @@ export default function ScreenManager() {
   const forceProjectsRef = useRef(false);
   const LAST_STEP_KEY = "sairyne_ui_last_step";
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
-  const cachedOsBootIdRef = useRef<string | null>(null);
 
   const clearAuthAndProject = (nextOsBootId?: string) => {
     try {
@@ -29,17 +28,6 @@ export default function ScreenManager() {
       // best-effort
     }
   };
-
-  // Capture the cached OS boot id (localStorage) on first mount, before JUCE inject overwrites it.
-  // This lets us detect OS reboot even if `sairyne_last_os_boot_id` wasn't present for some reason.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      cachedOsBootIdRef.current = window.localStorage?.getItem("sairyne_os_boot_id") ?? null;
-    } catch {
-      cachedOsBootIdRef.current = null;
-    }
-  }, []);
 
   const isChatStep = (step: Step | string | null): step is Step => {
     return (
@@ -74,19 +62,18 @@ export default function ScreenManager() {
     //   osBootId is loaded AND lastOsBootId exists AND they match.
     const osBootId = safeGetItem("sairyne_os_boot_id");
     const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
-    const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
 
     // If we can't verify the OS boot id yet, never auto-route away from Sign In.
     if (!osBootId) return "SignIn";
 
     // If we have no baseline to compare against, be conservative: sign out and require login.
-    if (!previousOsBootId) {
+    if (!lastOsBootId) {
       clearAuthAndProject(osBootId);
       return "SignIn";
     }
 
     // Reboot detected -> clear auth and require login.
-    if (osBootId !== previousOsBootId) {
+    if (osBootId !== lastOsBootId) {
       clearAuthAndProject(osBootId);
       return "SignIn";
     }
@@ -156,7 +143,6 @@ export default function ScreenManager() {
       if (isAuthed) {
         const osBootId = safeGetItem("sairyne_os_boot_id");
         const lastOsBootId = safeGetItem("sairyne_last_os_boot_id");
-        const previousOsBootId = lastOsBootId || cachedOsBootIdRef.current;
 
         // If os boot id hasn't arrived yet, hold on Sign In and wait.
         if (!osBootId) {
@@ -168,7 +154,7 @@ export default function ScreenManager() {
         }
 
         // No baseline -> sign out and require login.
-        if (!previousOsBootId) {
+        if (!lastOsBootId) {
           clearAuthAndProject(osBootId);
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;
@@ -180,7 +166,7 @@ export default function ScreenManager() {
         }
 
         // Reboot detected -> sign out and require login.
-        if (osBootId !== previousOsBootId) {
+        if (osBootId !== lastOsBootId) {
           clearAuthAndProject(osBootId);
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;

@@ -154,7 +154,9 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
       // User authenticated! Save locally
       try {
-        const osBootId = safeGetItem("sairyne_os_boot_id");
+        const osBootId =
+          safeGetItem("sairyne_os_boot_id") ||
+          (typeof window !== "undefined" ? window.localStorage?.getItem("sairyne_os_boot_id") ?? null : null);
         if (osBootId) {
           safeSetItem("sairyne_last_os_boot_id", osBootId);
         }
