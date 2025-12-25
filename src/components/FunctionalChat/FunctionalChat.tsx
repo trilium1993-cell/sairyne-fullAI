@@ -529,6 +529,64 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
   }, []); // Только при монтировании
 
+  // Scroll to show new AI message once, then let user scroll manually (like ChatGPT)
+  const scrollToNewMessage = () => {
+    if (chatContainerRef.current) {
+      // Wait for DOM to update before scrolling (50ms delay)
+      setTimeout(() => {
+        if (chatContainerRef.current) {
+          const container = chatContainerRef.current;
+          const targetScroll = container.scrollHeight - container.clientHeight;
+          container.scrollTop = targetScroll; // Instant scroll, one time only
+        }
+      }, 50);
+    }
+  };
+
+  // Add AI message with typing animation (MUST be declared before resumeLastRequest to avoid TDZ crash)
+  const addAIMessage = useCallback((content: string, onComplete?: () => void, isThinking?: boolean) => {
+    const message: Message = {
+      id: `ai-${Date.now()}`,
+      type: 'ai',
+      content: '',
+      timestamp: Date.now(),
+      isTyping: true,
+      isThinking
+    };
+
+    setMessages(prev => [...prev, message]);
+    // Scroll to the new message once when it appears
+    scrollToNewMessage();
+
+    // Split content into words and animate word-by-word
+    const words = content.split(' ');
+    let wordIndex = 0;
+
+    const typeNextWord = () => {
+      if (wordIndex < words.length) {
+        const currentText = words.slice(0, wordIndex + 1).join(' ');
+        setMessages(prev => prev.map(msg =>
+          msg.id === message.id
+            ? { ...msg, content: currentText }
+            : msg
+        ));
+        wordIndex++;
+        setTimeout(typeNextWord, 18);
+      } else {
+        setMessages(prev => prev.map(msg =>
+          msg.id === message.id
+            ? { ...msg, isTyping: false }
+            : msg
+        ));
+        if (onComplete) {
+          setTimeout(onComplete, 50);
+        }
+      }
+    };
+
+    setTimeout(typeNextWord, 50);
+  }, []);
+
   // Resume AI requests that were in-flight when the plugin UI was closed.
   const resumeAttemptedRef = useRef<Record<string, boolean>>({});
   const [showResumeBanner, setShowResumeBanner] = useState(false);
@@ -786,67 +844,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Создаем шаги чата с актуальным названием проекта
   const chatSteps = createChatSteps(projectName);
-
-  // Автоскролл к низу чата с плавной анимацией
-  // Scroll to show new AI message once, then let user scroll manually (like ChatGPT)
-  const scrollToNewMessage = () => {
-    if (chatContainerRef.current) {
-      // Scroll to show the new AI message that just appeared
-      // Wait for DOM to update before scrolling (50ms delay)
-      setTimeout(() => {
-        if (chatContainerRef.current) {
-          const container = chatContainerRef.current;
-          const targetScroll = container.scrollHeight - container.clientHeight;
-          container.scrollTop = targetScroll; // Instant scroll, one time only
-        }
-      }, 50);
-    }
-  };
-
-  // Добавляем AI сообщение с анимацией печатания
-  const addAIMessage = useCallback((content: string, onComplete?: () => void, isThinking?: boolean) => {
-    const message: Message = {
-      id: `ai-${Date.now()}`,
-      type: 'ai',
-      content: '',
-      timestamp: Date.now(),
-      isTyping: true,
-      isThinking
-    };
-
-    setMessages(prev => [...prev, message]);
-    // Scroll to the new message once when it appears
-    scrollToNewMessage();
-
-    // Split content into words and animate word-by-word with fade-in
-    const words = content.split(' ');
-    let wordIndex = 0;
-    
-    const typeNextWord = () => {
-      if (wordIndex < words.length) {
-        const currentText = words.slice(0, wordIndex + 1).join(' ');
-        setMessages(prev => prev.map(msg => 
-          msg.id === message.id 
-            ? { ...msg, content: currentText }
-            : msg
-        ));
-        wordIndex++;
-        // 18ms per word
-        setTimeout(typeNextWord, 18);
-      } else {
-        setMessages(prev => prev.map(msg => 
-          msg.id === message.id 
-            ? { ...msg, isTyping: false }
-            : msg
-        ));
-        if (onComplete) {
-          setTimeout(onComplete, 50);
-        }
-      }
-    };
-    
-    setTimeout(typeNextWord, 50);
-  }, []);
 
   // Добавляем пользовательское сообщение
   const addUserMessage = (content: string) => {
