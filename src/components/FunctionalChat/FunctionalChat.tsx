@@ -223,6 +223,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Persist scroll position even when user only scrolls (no new messages).
   const scrollDebounceTimerRef = useRef<number | null>(null);
   const persistChatStateNowRef = useRef<(() => void) | null>(null);
+  // Restore scroll reliably: WKWebView/React can clamp scrollTop to 0 if we set it before layout is ready.
+  const pendingInitialScrollRef = useRef<number | null>(null);
+  const scrollRestoreTimerRef = useRef<number | null>(null);
+  const scrollRestoreAttemptsRef = useRef(0);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -367,6 +371,36 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return msgs.slice(msgs.length - MAX_MESSAGES_PER_MODE);
   };
 
+  const scheduleReliableScrollRestore = useCallback((target: number) => {
+    pendingInitialScrollRef.current = Math.max(0, Number.isFinite(target) ? target : 0);
+    scrollRestoreAttemptsRef.current = 0;
+
+    const tick = () => {
+      const el = chatContainerRef.current;
+      const desired = pendingInitialScrollRef.current;
+      if (!el || desired == null) return;
+
+      const max = Math.max(0, el.scrollHeight - el.clientHeight);
+      const clampedDesired = Math.min(desired, max);
+      el.scrollTop = clampedDesired;
+
+      const closeEnough = Math.abs(el.scrollTop - clampedDesired) <= 2;
+      scrollRestoreAttemptsRef.current += 1;
+
+      if (closeEnough || scrollRestoreAttemptsRef.current >= 20) {
+        pendingInitialScrollRef.current = null;
+        if (scrollRestoreTimerRef.current) window.clearTimeout(scrollRestoreTimerRef.current);
+        scrollRestoreTimerRef.current = null;
+        return;
+      }
+
+      scrollRestoreTimerRef.current = window.setTimeout(tick, 50);
+    };
+
+    if (scrollRestoreTimerRef.current) window.clearTimeout(scrollRestoreTimerRef.current);
+    scrollRestoreTimerRef.current = window.setTimeout(tick, 0);
+  }, []);
+
   const tryHydrateFromStorage = useCallback(() => {
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
@@ -451,11 +485,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           isInitializedRef.current = true;
         }
 
-        requestAnimationFrame(() => {
-          if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = savedState.scrollPosition ?? 0;
-          }
-        });
+        // Restore scroll reliably (may require waiting for DOM/layout)
+        scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
       }
 
       return true;
@@ -463,7 +494,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       console.warn('[FunctionalChat] Failed to hydrate chat state:', e);
       return false;
     }
-  }, []);
+  }, [scheduleReliableScrollRestore]);
 
   // Инициализация состояния для текущего режима при первом рендере
   useEffect(() => {
@@ -825,6 +856,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     document.addEventListener('visibilitychange', onVisibility as any);
     return () => {
       el.removeEventListener('scroll', onScroll as any);
+      if (scrollRestoreTimerRef.current) {
+        window.clearTimeout(scrollRestoreTimerRef.current);
+        scrollRestoreTimerRef.current = null;
+      }
+      pendingInitialScrollRef.current = null;
       window.removeEventListener('pagehide', flush as any);
       window.removeEventListener('beforeunload', flush as any);
       document.removeEventListener('visibilitychange', onVisibility as any);
@@ -1561,12 +1597,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       setShowCompletedStep(savedState.showCompletedStep);
       setCompletedStepText(savedState.completedStepText);
       
-      // Восстанавливаем позицию скролла после рендера
-      requestAnimationFrame(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop = savedState.scrollPosition;
-        }
-      });
+      // Restore scroll reliably (may require waiting for DOM/layout)
+      scheduleReliableScrollRestore(savedState.scrollPosition);
     } else {
       // Если режим новый, сбрасываем состояние
       console.log('[FunctionalChat] New mode', level, '- resetting state');
@@ -1583,7 +1615,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     setSelectedLearnLevel(level);
     
     console.log('[FunctionalChat] Mode switched to', level);
-  }, [messages, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText, showFixIssuesChat]);
+  }, [messages, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText, showFixIssuesChat, scheduleReliableScrollRestore]);
+
+  // Extra safety: if hydration completes but layout was not ready yet, retry restoring the scroll once.
+  useEffect(() => {
+    if (!isProjectSessionReady || !isHydrationGateReady) return;
+    if (pendingInitialScrollRef.current == null) return;
+    scheduleReliableScrollRestore(pendingInitialScrollRef.current);
+  }, [isProjectSessionReady, isHydrationGateReady, messages.length, scheduleReliableScrollRestore]);
 
   const handleCloseLearnMode = useCallback(() => {
     setShowLearnMode(false);
