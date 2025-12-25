@@ -531,6 +531,78 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Resume AI requests that were in-flight when the plugin UI was closed.
   const resumeAttemptedRef = useRef<Record<string, boolean>>({});
+  const [showResumeBanner, setShowResumeBanner] = useState(false);
+  const resumeLastRequest = useCallback(() => {
+    const sessionKey = resolveActiveSessionKey();
+    if (!sessionKey) return;
+    try {
+      const raw = safeGetItem(CHAT_STATE_KEY);
+      if (!raw) return;
+      const root = safeJsonParse<any>(raw, null);
+      const pending = root?.sessions?.[sessionKey]?.pendingAi;
+      if (!pending) return;
+
+      const thinkingId = String(pending.thinkingId || `ai-thinking-${Date.now()}`);
+
+      // If we already have a received response, just render it again (no network).
+      if (typeof pending.responseText === 'string' && pending.responseText.length > 0) {
+        setMessages((prev) => prev.filter((m) => !(m as any).isThinking && !(m as any).isTyping));
+        addAIMessage(String(pending.responseText), () => {
+          try {
+            const existing = safeGetItem(CHAT_STATE_KEY);
+            if (existing) {
+              const root2 = safeJsonParse<any>(existing, {}) || {};
+              if (root2?.sessions?.[sessionKey]) {
+                delete root2.sessions[sessionKey].pendingAi;
+                safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
+              }
+            }
+          } catch {}
+        });
+        return;
+      }
+
+      // Otherwise, retry the request.
+      const messageText = String(pending.messageText || '');
+      const mode = pending.mode as 'pro' | 'create' | 'learn';
+      const conversationHistory = Array.isArray(pending.conversationHistory)
+        ? pending.conversationHistory
+        : messages
+            .filter((msg) => {
+              const isValid = !(msg as any).isThinking && !(msg as any).isTyping && msg.content.trim() !== '';
+              const isNotSystem = msg.content !== "Completed. Next step." && !msg.content.includes("Completed.");
+              return isValid && isNotSystem;
+            })
+            .map((msg) => ({ type: msg.type, content: msg.content }));
+
+      setMessages((prev) => {
+        const withoutThinking = prev.filter((m) => !(m as any).isThinking);
+        return [...withoutThinking, { id: thinkingId, type: 'ai', content: '...', timestamp: Date.now(), isThinking: true } as any];
+      });
+
+      ChatService.sendMessage(messageText, conversationHistory, mode)
+        .then((aiResponse) => {
+          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
+          addAIMessage(aiResponse, () => {
+            try {
+              const existing = safeGetItem(CHAT_STATE_KEY);
+              if (existing) {
+                const root2 = safeJsonParse<any>(existing, {}) || {};
+                if (root2?.sessions?.[sessionKey]) {
+                  delete root2.sessions[sessionKey].pendingAi;
+                  safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
+                }
+              }
+            } catch {}
+          });
+        })
+        .catch(() => {
+          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
+          addAIMessage("Your previous request was interrupted. Click Resume to try again.");
+        });
+    } catch {}
+  }, [addAIMessage, messages]);
+
   useEffect(() => {
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
@@ -547,49 +619,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // Mark attempt so we don't loop.
       resumeAttemptedRef.current[sessionKey] = true;
 
-      const messageText = String(pending.messageText);
-      const mode = pending.mode as 'pro' | 'create' | 'learn';
-
-      // Ensure a thinking indicator exists in the restored UI.
-      const hasThinking = messages.some((m) => (m as any).isThinking);
-      if (!hasThinking) {
-        setMessages((prev) => [
-          ...prev,
-          { id: String(pending.thinkingId || `ai-thinking-${Date.now()}`), type: 'ai', content: '...', timestamp: Date.now(), isThinking: true } as any,
-        ]);
-      }
-
-      // Rebuild conversation history from restored messages (excluding thinking).
-      const conversationHistory = messages
-        .filter((msg) => {
-          const isValid = !(msg as any).isThinking && !(msg as any).isTyping && msg.content.trim() !== '';
-          const isNotSystem = msg.content !== "Completed. Next step." && !msg.content.includes("Completed.");
-          return isValid && isNotSystem;
-        })
-        .map((msg) => ({ type: msg.type, content: msg.content }));
-
-      ChatService.sendMessage(messageText, conversationHistory, mode)
-        .then((aiResponse) => {
-          // Remove thinking
-          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
-          // Clear pending marker
-          try {
-            const existing = safeGetItem(CHAT_STATE_KEY);
-            if (existing) {
-              const root2 = safeJsonParse<any>(existing, {}) || {};
-              if (root2?.sessions?.[sessionKey]) {
-                delete root2.sessions[sessionKey].pendingAi;
-                safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
-              }
-            }
-          } catch {}
-          addAIMessage(aiResponse);
-        })
-        .catch(() => {
-          // Keep the thinking message removed but show a retry hint.
-          setMessages((prev) => prev.filter((m) => !(m as any).isThinking));
-          addAIMessage("Your previous request was interrupted when the plugin was closed. Please try sending again.");
-        });
+      // Attempt auto-resume; if it still fails/hangs, user can use Resume button.
+      setShowResumeBanner(true);
+      resumeLastRequest();
     } catch {
       // ignore
     }
@@ -968,6 +1000,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               mode: aiMode,
               startedAt: Date.now(),
               thinkingId,
+              conversationHistory,
             };
             safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
           }
@@ -986,23 +1019,41 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               return filtered;
             });
 
-            // Clear pending AI request marker (best-effort).
+            // Store the received response inside pendingAi until rendering completes.
             try {
               const sessionKey = resolveActiveSessionKey();
               if (sessionKey) {
                 const existing = safeGetItem(CHAT_STATE_KEY);
                 if (existing) {
                   const root = safeJsonParse<any>(existing, {}) || {};
-                  if (root?.sessions?.[sessionKey]) {
-                    delete root.sessions[sessionKey].pendingAi;
+                  const pending = root?.sessions?.[sessionKey]?.pendingAi;
+                  if (pending && typeof pending === 'object') {
+                    pending.responseText = aiResponse;
+                    pending.receivedAt = Date.now();
+                    pending.status = 'response';
+                    root.sessions[sessionKey].pendingAi = pending;
                     safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
                   }
                 }
               }
             } catch {}
-            
-            // Добавляем ответ AI с анимацией печатания
-            addAIMessage(aiResponse);
+
+            // Add AI response with typing animation; clear pendingAi only after typing completes.
+            addAIMessage(aiResponse, () => {
+              try {
+                const sessionKey = resolveActiveSessionKey();
+                if (sessionKey) {
+                  const existing = safeGetItem(CHAT_STATE_KEY);
+                  if (existing) {
+                    const root = safeJsonParse<any>(existing, {}) || {};
+                    if (root?.sessions?.[sessionKey]) {
+                      delete root.sessions[sessionKey].pendingAi;
+                      safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+                    }
+                  }
+                }
+              } catch {}
+            });
             AnalyticsService.track('AIMessageSent', {
               mode: 'pro',
               characters: aiResponse?.length || 0,
@@ -1810,6 +1861,21 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               }}
               showStep3Content={showStep3Content}
             />
+            )}
+
+            {showResumeBanner && (
+              <div className="absolute left-[10px] right-[10px] bottom-[132px] z-[910] flex items-center justify-between gap-3 rounded-xl bg-white/10 px-4 py-3 text-sm text-white backdrop-blur">
+                <div className="truncate">
+                  Response interrupted. You can resume/retry the last question.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => resumeLastRequest()}
+                  className="rounded-lg bg-white/15 px-3 py-1.5 text-white transition-colors hover:bg-white/25"
+                >
+                  Resume
+                </button>
+              </div>
             )}
 
             {/* Поле ввода сообщения */}
