@@ -611,8 +611,9 @@ if (typeof window !== 'undefined') {
         Object.entries(data).forEach(([key, value]) => {
           // IMPORTANT: runtime boot id must be runtime-only, never cached across host restarts.
           if (
+            // IMPORTANT: runtime boot id must be runtime-only, never cached across host restarts.
             key === 'sairyne_runtime_boot_id' ||
-            key === 'sairyne_os_boot_id' ||
+            // UI routing keys can cause sticky navigation if cached.
             key === 'sairyne_ui_last_step' ||
             key === 'sairyne_ui_pin_signin'
           ) {
