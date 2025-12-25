@@ -221,7 +221,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
   // Persist scroll position even when user only scrolls (no new messages).
-  const [scrollSaveNonce, setScrollSaveNonce] = useState(0);
   const scrollDebounceTimerRef = useRef<number | null>(null);
   const persistChatStateNowRef = useRef<(() => void) | null>(null);
 
@@ -779,7 +778,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
     }, 900);
     return () => window.clearTimeout(t);
-  }, [persistChatStateNow, scrollSaveNonce, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
+  }, [persistChatStateNow, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
   // Persist scroll position while user scrolls (debounced) + flush on unmount.
   useEffect(() => {
@@ -794,13 +793,41 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
       if (scrollDebounceTimerRef.current) window.clearTimeout(scrollDebounceTimerRef.current);
       scrollDebounceTimerRef.current = window.setTimeout(() => {
-        setScrollSaveNonce((n) => n + 1);
+        try {
+          // Persist quickly so "scroll then immediately close plugin" still restores correctly.
+          persistChatStateNowRef.current?.();
+        } catch {}
       }, 250);
     };
 
     el.addEventListener('scroll', onScroll as any, { passive: true } as any);
+
+    const flush = () => {
+      try {
+        // Ensure we capture latest scrollTop before persisting.
+        const mode = previousModeRef.current || selectedLearnLevel || 'learn';
+        const st = modeStatesRef.current[mode];
+        if (st && chatContainerRef.current) {
+          modeStatesRef.current[mode] = { ...st, scrollPosition: chatContainerRef.current.scrollTop };
+        }
+        persistChatStateNowRef.current?.();
+      } catch {}
+    };
+
+    const onVisibility = () => {
+      try {
+        if (typeof document !== 'undefined' && document.hidden) flush();
+      } catch {}
+    };
+
+    window.addEventListener('pagehide', flush as any);
+    window.addEventListener('beforeunload', flush as any);
+    document.addEventListener('visibilitychange', onVisibility as any);
     return () => {
       el.removeEventListener('scroll', onScroll as any);
+      window.removeEventListener('pagehide', flush as any);
+      window.removeEventListener('beforeunload', flush as any);
+      document.removeEventListener('visibilitychange', onVisibility as any);
       if (scrollDebounceTimerRef.current) {
         window.clearTimeout(scrollDebounceTimerRef.current);
         scrollDebounceTimerRef.current = null;
