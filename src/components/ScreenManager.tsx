@@ -3,6 +3,7 @@ import { Step, NEXT } from "../flow/steps";
 import { getScreenComponent } from "../flow/registry";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 import { getSelectedProject } from "../services/projects";
+import { setGlobalLoading } from "../services/loadingService";
 
 export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
@@ -302,6 +303,12 @@ export default function ScreenManager() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Global cursor spinner while OS-gate is pending.
+  useEffect(() => {
+    setGlobalLoading("os-gate", isOsGatePending);
+    return () => setGlobalLoading("os-gate", false);
+  }, [isOsGatePending]);
 
   // Persist last visible screen so reopening the plugin window resumes the same UI (projects vs chat).
   useEffect(() => {

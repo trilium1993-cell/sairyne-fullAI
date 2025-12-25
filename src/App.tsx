@@ -8,6 +8,7 @@ import "../tailwind.css";
 import { MasterChannelNotice } from "./components/MasterChannelNotice";
 import { loadDataFromJuce, onDataLoaded, isJuceAvailable } from "./services/audio/juceBridge";
 import { isLocalStorageAvailable } from "./utils/storage";
+import { CursorLoadingIndicator } from "./components/CursorLoadingIndicator/CursorLoadingIndicator";
 
 function App() {
   useEffect(() => {
@@ -119,6 +120,7 @@ function App() {
           minHeight: '100vh',
           backgroundColor: '#0b0a0f'
         }}>
+          <CursorLoadingIndicator />
           <Routes>
             <Route path="/register" element={<RegisterPlugin />} />
             <Route path="*" element={

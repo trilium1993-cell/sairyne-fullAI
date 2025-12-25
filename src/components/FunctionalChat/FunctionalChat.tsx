@@ -24,6 +24,7 @@ import { getActiveUserEmail } from "../../services/auth";
 import { safeGetItem, safeSetItem } from "../../utils/storage";
 import { safeJsonParse } from "../../utils/safeJson";
 import { setPluginExpanded } from "../../services/audio/juceBridge";
+import { setGlobalLoading } from "../../services/loadingService";
 
 const SEND_ICON = "https://c.animaapp.com/hOiZ2IT6/img/frame-13-1.svg";
 const ANALYSIS_ICON = "https://c.animaapp.com/hOiZ2IT6/img/waveform-light-1-1.svg";
@@ -227,6 +228,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // Global cursor spinner for "wait" states in chat (AI thinking / reconnecting / hydration).
+  useEffect(() => {
+    const hasThinking = messages.some((m) => (m as any)?.isThinking) || aiRequestInFlightRef.current;
+    setGlobalLoading("chat-ai", hasThinking);
+    return () => setGlobalLoading("chat-ai", false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  useEffect(() => {
+    setGlobalLoading("chat-reconnect", isCheckingHealth);
+    return () => setGlobalLoading("chat-reconnect", false);
+  }, [isCheckingHealth]);
+
+  useEffect(() => {
+    const pendingHydration = Boolean(isProjectSessionReady && !isHydrationGateReady);
+    setGlobalLoading("chat-hydration", pendingHydration);
+    return () => setGlobalLoading("chat-hydration", false);
+  }, [isProjectSessionReady, isHydrationGateReady]);
   
   // Сохранение состояния для каждого режима
   interface ModeState {
