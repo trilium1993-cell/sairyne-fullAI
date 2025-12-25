@@ -184,7 +184,8 @@ export function setCurrentUser(user: AuthUser | null) {
   try {
     if (!user) {
       console.log('[Auth] 🔄 Removing current user');
-      safeRemoveItem(CURRENT_USER_KEY);
+      // NOTE: JUCE persistence rejects empty values; use a non-empty tombstone for "clearing".
+      safeSetItem(CURRENT_USER_KEY, '0');
       return;
     }
     const userJson = JSON.stringify(user);
@@ -208,7 +209,10 @@ export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   
   try {
-    return safeGetItem(ACCESS_TOKEN_KEY);
+    const raw = safeGetItem(ACCESS_TOKEN_KEY);
+    // NOTE: JUCE persistence rejects empty values; we use "0" as a tombstone for signed-out.
+    if (!raw || raw === '0') return null;
+    return raw;
   } catch (error) {
     console.warn('[Auth] Error getting access token:', error);
     return null;
@@ -220,7 +224,8 @@ export function setAccessToken(token: string | null) {
   
   try {
     if (!token) {
-      safeRemoveItem(ACCESS_TOKEN_KEY);
+      // NOTE: JUCE persistence rejects empty values; use a non-empty tombstone for "clearing".
+      safeSetItem(ACCESS_TOKEN_KEY, '0');
       return;
     }
     const success = safeSetItem(ACCESS_TOKEN_KEY, token);

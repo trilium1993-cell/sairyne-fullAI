@@ -505,9 +505,9 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
         onClose={() => setShowBackToSignIn(false)}
         onConfirm={() => {
           // Sign out but keep draft email for convenience.
-          safeRemoveItem('sairyne_access_token');
-          safeRemoveItem('sairyne_current_user');
-          safeRemoveItem('sairyne_selected_project');
+          // NOTE: JUCE persistence rejects empty values; use a non-empty tombstone for "clearing".
+          safeSetItem('sairyne_access_token', '0');
+          safeSetItem('sairyne_selected_project', '0');
           onBack();
         }}
       />

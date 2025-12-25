@@ -200,7 +200,8 @@ export function setSelectedProject(project: StoredProject | null): void {
   
   try {
     if (!project) {
-      safeRemoveItem(SELECTED_PROJECT_KEY);
+      // NOTE: JUCE persistence rejects empty values; use a non-empty tombstone for "clearing".
+      safeSetItem(SELECTED_PROJECT_KEY, "0");
       return;
     }
     // Store the full project (including createdAt) so we can restore reliably even if the
@@ -225,7 +226,7 @@ export function getSelectedProject(): StoredProject | null {
   
   try {
     const raw = safeGetItem(SELECTED_PROJECT_KEY);
-    if (!raw) return null;
+    if (!raw || raw === "0") return null;
     const parsed = safeJsonParse<any>(raw, null);
     if (!parsed || typeof parsed.id !== "number") return null;
 
@@ -256,5 +257,6 @@ export function getSelectedProject(): StoredProject | null {
 
 export function clearSelectedProject() {
   if (typeof window === "undefined") return;
-  safeRemoveItem(SELECTED_PROJECT_KEY);
+  // NOTE: JUCE persistence rejects empty values; use a non-empty tombstone for "clearing".
+  safeSetItem(SELECTED_PROJECT_KEY, "0");
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Step, NEXT } from "../flow/steps";
 import { getScreenComponent } from "../flow/registry";
-import { safeGetItem, safeSetItem, safeRemoveItem } from "../utils/storage";
+import { safeGetItem, safeSetItem } from "../utils/storage";
 import { getSelectedProject } from "../services/projects";
 
 export default function ScreenManager() {
@@ -16,11 +16,15 @@ export default function ScreenManager() {
   const LAST_STEP_KEY = "sairyne_ui_last_step";
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
 
+  // JUCE-side persistence currently rejects empty values (see Sairyne.log).
+  // Use a non-empty tombstone for "clearing" persisted keys.
+  const TOMBSTONE = "0";
+
   const clearAuthAndProject = (nextOsBootId?: string) => {
     try {
-      safeRemoveItem("sairyne_access_token");
-      safeRemoveItem("sairyne_current_user");
-      safeRemoveItem("sairyne_selected_project");
+      // Keep current_user for convenience (prefill email), but invalidate auth token.
+      safeSetItem("sairyne_access_token", TOMBSTONE);
+      safeSetItem("sairyne_selected_project", TOMBSTONE);
       if (nextOsBootId) {
         safeSetItem("sairyne_last_os_boot_id", nextOsBootId);
       }
@@ -46,7 +50,7 @@ export default function ScreenManager() {
     // Auth
     const token = safeGetItem("sairyne_access_token");
     const currentUser = safeGetItem("sairyne_current_user");
-    const isAuthed = Boolean(token && currentUser);
+    const isAuthed = Boolean(token && token !== TOMBSTONE && currentUser && currentUser !== TOMBSTONE);
 
     if (!isAuthed) return "SignIn";
 
@@ -85,7 +89,7 @@ export default function ScreenManager() {
     const lastBootId = safeGetItem("sairyne_last_boot_id");
     if (runtimeBootId && runtimeBootId !== lastBootId) {
       // Host restart should also clear any "pinned Sign In" (it is intended for a live session account switch).
-      safeRemoveItem(PIN_SIGNIN_KEY);
+      safeSetItem(PIN_SIGNIN_KEY, TOMBSTONE);
       // Persist for next opens within the same host process.
       safeSetItem("sairyne_last_boot_id", runtimeBootId);
       return "ChooseYourProject";
@@ -112,7 +116,7 @@ export default function ScreenManager() {
       // Determine auth status (sync reads; values may arrive async via JUCE events)
       const token = safeGetItem("sairyne_access_token");
       const currentUser = safeGetItem("sairyne_current_user");
-      const isAuthed = Boolean(token && currentUser);
+      const isAuthed = Boolean(token && token !== TOMBSTONE && currentUser && currentUser !== TOMBSTONE);
 
       if (isAuthed) {
         if (authedSinceRef.current === null) authedSinceRef.current = Date.now();
@@ -298,7 +302,7 @@ export default function ScreenManager() {
       if (currentStep === "SignIn") {
         manualStayOnSignInRef.current = false;
         // Leaving Sign In via normal flow means "unpinned".
-        safeRemoveItem(PIN_SIGNIN_KEY);
+        safeSetItem(PIN_SIGNIN_KEY, TOMBSTONE);
       }
       setHistory(prev => [...prev, currentStep]);
       setCurrentStep(nextStep);
