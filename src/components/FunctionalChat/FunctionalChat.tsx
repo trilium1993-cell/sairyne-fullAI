@@ -21,7 +21,7 @@ import { resolveIsEmbedded } from "../../utils/embed";
 import { AnalyticsService } from "../../services/analyticsService";
 import { getSelectedProject } from "../../services/projects";
 import { getActiveUserEmail } from "../../services/auth";
-import { safeGetItem, safeSetItem, safeRemoveItem } from "../../utils/storage";
+import { safeGetItem, safeSetItem } from "../../utils/storage";
 import { safeJsonParse } from "../../utils/safeJson";
 import { setPluginExpanded } from "../../services/audio/juceBridge";
 
@@ -219,6 +219,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
+  // Persist scroll position even when user only scrolls (no new messages).
+  const [scrollSaveNonce, setScrollSaveNonce] = useState(0);
+  const scrollDebounceTimerRef = useRef<number | null>(null);
+  const persistChatStateNowRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -244,6 +248,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
   const MAX_MESSAGES_PER_MODE = 200;
+  const TOMBSTONE = '0';
   const resolveActiveSessionKey = () => {
     const selected = getSelectedProject();
     // If no project selected yet, do NOT reuse any previous chat session.
@@ -259,6 +264,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
       if (!raw) return null; // unknown (may still be loading from JUCE)
+      if (raw === TOMBSTONE) return false;
       const parsed = safeJsonParse<any>(raw, null);
       if (!parsed || typeof parsed !== 'object') return false;
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
@@ -345,10 +351,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const tryHydrateFromStorage = useCallback(() => {
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
-      if (!raw) return false;
+      if (!raw || raw === TOMBSTONE) return false;
       // Guardrail: if chat state is corrupted/too large, reset only this key.
       if (raw.length > 350_000) {
-        safeRemoveItem(CHAT_STATE_KEY);
+        // NOTE: JUCE persistence rejects empty values; use tombstone for "clearing".
+        safeSetItem(CHAT_STATE_KEY, TOMBSTONE);
         return false;
       }
       const parsed = safeJsonParse<any>(raw, null);
@@ -686,57 +693,105 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   }, [isProjectSessionReady, messages, selectedLearnLevel]);
 
   // Persist chat state (debounced) so AU/VST3 window reload doesn't wipe it
+  const persistChatStateNow = useCallback(() => {
+    const sessionKey = resolveActiveSessionKey();
+    if (!sessionKey) return;
+
+    // Ensure active mode state includes the latest scroll position (even if user only scrolled).
+    const activeMode = previousModeRef.current || selectedLearnLevel || 'learn';
+    const existingActive = modeStatesRef.current[activeMode];
+    const latestScroll = chatContainerRef.current?.scrollTop;
+    if (existingActive && typeof latestScroll === 'number') {
+      modeStatesRef.current[activeMode] = { ...existingActive, scrollPosition: latestScroll };
+    }
+
+    // Cap stored messages per mode to keep PropertiesFile writes stable.
+    const cappedModeStates: any = {};
+    (['learn', 'create', 'pro'] as const).forEach((mode) => {
+      const st = modeStatesRef.current[mode];
+      cappedModeStates[mode] = {
+        ...st,
+        messages: trimMessages(st?.messages ?? []),
+      };
+    });
+
+    const sessionPayload = {
+      v: 1,
+      ownerEmail: (getSelectedProject() as any)?.ownerEmail || getActiveUserEmail(),
+      selectedLearnLevel,
+      completedSteps,
+      hasCompletedAnalysis,
+      modeStates: cappedModeStates,
+      savedAt: Date.now(),
+    };
+
+    // Store per-project session inside a single persisted key (so C++ inject can stay simple)
+    let root: any = {};
+    try {
+      const existing = safeGetItem(CHAT_STATE_KEY);
+      if (existing && existing !== TOMBSTONE) {
+        root = safeJsonParse<any>(existing, {});
+      }
+    } catch {}
+
+    if (!root || typeof root !== 'object') root = {};
+    if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
+    root.v = 2;
+    // Preserve transient per-session metadata (e.g. pending AI request) across normal state saves.
+    const prevSession = root.sessions[sessionKey];
+    const pendingAi = prevSession && typeof prevSession === 'object' ? (prevSession as any).pendingAi : undefined;
+    root.sessions[sessionKey] = pendingAi ? { ...sessionPayload, pendingAi } : sessionPayload;
+    root.savedAt = Date.now();
+
+    safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+  }, [completedSteps, hasCompletedAnalysis, selectedLearnLevel, trimMessages]);
+
+  useEffect(() => {
+    persistChatStateNowRef.current = persistChatStateNow;
+  }, [persistChatStateNow]);
+
   useEffect(() => {
     const t = window.setTimeout(() => {
       try {
-        const sessionKey = resolveActiveSessionKey();
-        if (!sessionKey) return;
-
-        // Cap stored messages per mode to keep PropertiesFile writes stable.
-        const cappedModeStates: any = {};
-        (['learn', 'create', 'pro'] as const).forEach((mode) => {
-          const st = modeStatesRef.current[mode];
-          cappedModeStates[mode] = {
-            ...st,
-            messages: trimMessages(st?.messages ?? []),
-          };
-        });
-
-        const sessionPayload = {
-          v: 1,
-          ownerEmail: (getSelectedProject() as any)?.ownerEmail || getActiveUserEmail(),
-          selectedLearnLevel,
-          completedSteps,
-          hasCompletedAnalysis,
-          modeStates: cappedModeStates,
-          savedAt: Date.now(),
-        };
-
-        // Store per-project session inside a single persisted key (so C++ inject can stay simple)
-        let root: any = {};
-        try {
-          const existing = safeGetItem(CHAT_STATE_KEY);
-          if (existing) {
-            root = safeJsonParse<any>(existing, {});
-          }
-        } catch {}
-
-        if (!root || typeof root !== 'object') root = {};
-        if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
-        root.v = 2;
-        // Preserve transient per-session metadata (e.g. pending AI request) across normal state saves.
-        const prevSession = root.sessions[sessionKey];
-        const pendingAi = prevSession && typeof prevSession === 'object' ? (prevSession as any).pendingAi : undefined;
-        root.sessions[sessionKey] = pendingAi ? { ...sessionPayload, pendingAi } : sessionPayload;
-        root.savedAt = Date.now();
-
-        safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+        persistChatStateNow();
       } catch (e) {
         console.warn('[FunctionalChat] Failed to persist chat state:', e);
       }
     }, 900);
     return () => window.clearTimeout(t);
-  }, [selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
+  }, [persistChatStateNow, scrollSaveNonce, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
+
+  // Persist scroll position while user scrolls (debounced) + flush on unmount.
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    if (!el || typeof window === 'undefined') return;
+
+    const onScroll = () => {
+      const mode = previousModeRef.current || selectedLearnLevel || 'learn';
+      const st = modeStatesRef.current[mode];
+      if (st) {
+        modeStatesRef.current[mode] = { ...st, scrollPosition: el.scrollTop };
+      }
+      if (scrollDebounceTimerRef.current) window.clearTimeout(scrollDebounceTimerRef.current);
+      scrollDebounceTimerRef.current = window.setTimeout(() => {
+        setScrollSaveNonce((n) => n + 1);
+      }, 250);
+    };
+
+    el.addEventListener('scroll', onScroll as any, { passive: true } as any);
+    return () => {
+      el.removeEventListener('scroll', onScroll as any);
+      if (scrollDebounceTimerRef.current) {
+        window.clearTimeout(scrollDebounceTimerRef.current);
+        scrollDebounceTimerRef.current = null;
+      }
+      try {
+        persistChatStateNowRef.current?.();
+      } catch {}
+    };
+    // Intentionally attach once; we rely on refs for latest state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Автоматическое сохранение состояния для текущего режима при изменениях
   useEffect(() => {
