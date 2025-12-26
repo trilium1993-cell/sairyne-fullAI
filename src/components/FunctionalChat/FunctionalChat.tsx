@@ -393,10 +393,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
 
       const max = Math.max(0, el.scrollHeight - el.clientHeight);
-      const clampedDesired = Math.min(desired, max);
-      el.scrollTop = clampedDesired;
+      // IMPORTANT: On initial mount, max can be 0 (content not laid out yet).
+      // If desired > 0 but max < desired, we must keep retrying; otherwise we'll "succeed" at 0 and stop,
+      // which is exactly the bug you're seeing (chat always opens at top).
+      const canReachDesired = max >= desired;
+      const targetScrollTop = canReachDesired ? desired : max;
+      el.scrollTop = targetScrollTop;
 
-      const closeEnough = Math.abs(el.scrollTop - clampedDesired) <= 2;
+      const closeEnough = canReachDesired && Math.abs(el.scrollTop - desired) <= 2;
       scrollRestoreAttemptsRef.current += 1;
 
       if (closeEnough || scrollRestoreAttemptsRef.current >= 20) {
