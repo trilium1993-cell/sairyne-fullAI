@@ -238,7 +238,7 @@ export const YourProjects = ({ onNext, onBack }: YourProjectsProps): JSX.Element
 
         <button
           onClick={() => setShowBackToSignIn(true)}
-          className="absolute top-[23px] right-[12px] h-7 px-3 rounded-md border border-solid border-[#ff4d4d66] bg-[#ff00001a] text-[#ff9b9b] text-[11px] font-medium hover:bg-[#ff00002b] hover:border-[#ff4d4dcc] transition-colors"
+          className="absolute top-[23px] right-[12px] h-7 px-3 rounded-md border border-solid border-[#ffffff2b] bg-[#ffffff10] text-[#ffffffcc] text-[11px] font-medium hover:bg-[#ffffff1a] hover:border-[#ffffff4d] transition-colors"
           aria-label="Back to Sign In"
           type="button"
         >
