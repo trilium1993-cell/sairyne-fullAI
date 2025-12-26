@@ -75,10 +75,10 @@ export default function ScreenManager() {
     // If baseline hasn't loaded yet (JUCE may inject it async), wait. Do NOT clear auth here.
     if (lastOsBootId == null) return "SignIn";
     // If baseline is explicitly missing (tombstone), require login and establish baseline.
-    if (lastOsBootId === TOMBSTONE) {
-      clearAuthAndProject(osBootId);
-      return "SignIn";
-    }
+    // IMPORTANT: do NOT clear the token just because baseline is missing.
+    // That was causing "random sign-outs" when the baseline key wasn't persisted yet.
+    // We still require Sign In UI, but we keep persisted auth intact.
+    if (lastOsBootId === TOMBSTONE) return "SignIn";
 
     // Reboot detected -> clear auth and require login.
     if (osBootId !== lastOsBootId) {
@@ -178,8 +178,9 @@ export default function ScreenManager() {
         }
 
         // Baseline explicitly missing -> sign out and require login.
+        // IMPORTANT: do NOT clear the token just because baseline is missing.
+        // We still require Sign In UI, but we keep persisted auth intact.
         if (lastOsBootId === TOMBSTONE) {
-          clearAuthAndProject(osBootId);
           forceProjectsRef.current = false;
           manualStayOnProjectsRef.current = false;
           manualStayOnSignInRef.current = false;

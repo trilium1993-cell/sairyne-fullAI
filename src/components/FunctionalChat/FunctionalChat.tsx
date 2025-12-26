@@ -378,7 +378,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const tick = () => {
       const el = chatContainerRef.current;
       const desired = pendingInitialScrollRef.current;
-      if (!el || desired == null) return;
+      if (desired == null) return;
+      // If the container isn't mounted yet, keep retrying briefly.
+      if (!el) {
+        scrollRestoreAttemptsRef.current += 1;
+        if (scrollRestoreAttemptsRef.current >= 20) {
+          pendingInitialScrollRef.current = null;
+          if (scrollRestoreTimerRef.current) window.clearTimeout(scrollRestoreTimerRef.current);
+          scrollRestoreTimerRef.current = null;
+          return;
+        }
+        scrollRestoreTimerRef.current = window.setTimeout(tick, 50);
+        return;
+      }
 
       const max = Math.max(0, el.scrollHeight - el.clientHeight);
       const clampedDesired = Math.min(desired, max);
@@ -811,59 +823,88 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return () => window.clearTimeout(t);
   }, [persistChatStateNow, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
-  // Persist scroll position while user scrolls (debounced) + flush on unmount.
+  // Persist scroll position reliably.
+  // In some hosts the chat container mounts after this component's first effect runs.
+  // We attach/re-attach the scroll listener when the underlying DOM node becomes available.
+  const attachedScrollElRef = useRef<HTMLDivElement | null>(null);
+  const scrollCleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const el = chatContainerRef.current;
-    if (!el || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
 
-    const onScroll = () => {
-      const mode = previousModeRef.current || selectedLearnLevel || 'learn';
-      const st = modeStatesRef.current[mode];
-      if (st) {
-        modeStatesRef.current[mode] = { ...st, scrollPosition: el.scrollTop };
-      }
-      if (scrollDebounceTimerRef.current) window.clearTimeout(scrollDebounceTimerRef.current);
-      scrollDebounceTimerRef.current = window.setTimeout(() => {
+    const attachTo = (el: HTMLDivElement) => {
+      const onScroll = () => {
+        const mode = previousModeRef.current || 'learn';
+        const st = modeStatesRef.current[mode];
+        if (st) {
+          modeStatesRef.current[mode] = { ...st, scrollPosition: el.scrollTop };
+        }
+        if (scrollDebounceTimerRef.current) window.clearTimeout(scrollDebounceTimerRef.current);
+        scrollDebounceTimerRef.current = window.setTimeout(() => {
+          try {
+            persistChatStateNowRef.current?.();
+          } catch {}
+        }, 250);
+      };
+
+      const flush = () => {
         try {
-          // Persist quickly so "scroll then immediately close plugin" still restores correctly.
+          const mode = previousModeRef.current || 'learn';
+          const st = modeStatesRef.current[mode];
+          const live = chatContainerRef.current;
+          if (st && live) {
+            modeStatesRef.current[mode] = { ...st, scrollPosition: live.scrollTop };
+          }
           persistChatStateNowRef.current?.();
         } catch {}
-      }, 250);
+      };
+
+      const onVisibility = () => {
+        try {
+          if (typeof document !== 'undefined' && document.hidden) flush();
+        } catch {}
+      };
+
+      el.addEventListener('scroll', onScroll as any, { passive: true } as any);
+      window.addEventListener('pagehide', flush as any);
+      window.addEventListener('beforeunload', flush as any);
+      document.addEventListener('visibilitychange', onVisibility as any);
+
+      return () => {
+        try {
+          el.removeEventListener('scroll', onScroll as any);
+          window.removeEventListener('pagehide', flush as any);
+          window.removeEventListener('beforeunload', flush as any);
+          document.removeEventListener('visibilitychange', onVisibility as any);
+        } catch {}
+      };
     };
 
-    el.addEventListener('scroll', onScroll as any, { passive: true } as any);
-
-    const flush = () => {
+    const ensureAttached = () => {
+      const el = chatContainerRef.current;
+      if (!el) return;
+      if (attachedScrollElRef.current === el) return;
+      // Re-attach if DOM node changed (e.g. host remounts WebView subtree).
       try {
-        // Ensure we capture latest scrollTop before persisting.
-        const mode = previousModeRef.current || selectedLearnLevel || 'learn';
-        const st = modeStatesRef.current[mode];
-        if (st && chatContainerRef.current) {
-          modeStatesRef.current[mode] = { ...st, scrollPosition: chatContainerRef.current.scrollTop };
-        }
-        persistChatStateNowRef.current?.();
+        scrollCleanupRef.current?.();
       } catch {}
+      attachedScrollElRef.current = el;
+      scrollCleanupRef.current = attachTo(el);
     };
 
-    const onVisibility = () => {
-      try {
-        if (typeof document !== 'undefined' && document.hidden) flush();
-      } catch {}
-    };
-
-    window.addEventListener('pagehide', flush as any);
-    window.addEventListener('beforeunload', flush as any);
-    document.addEventListener('visibilitychange', onVisibility as any);
+    ensureAttached();
+    const t = window.setInterval(ensureAttached, 150);
     return () => {
-      el.removeEventListener('scroll', onScroll as any);
+      window.clearInterval(t);
+      try {
+        scrollCleanupRef.current?.();
+      } catch {}
+      scrollCleanupRef.current = null;
+      attachedScrollElRef.current = null;
       if (scrollRestoreTimerRef.current) {
         window.clearTimeout(scrollRestoreTimerRef.current);
         scrollRestoreTimerRef.current = null;
       }
       pendingInitialScrollRef.current = null;
-      window.removeEventListener('pagehide', flush as any);
-      window.removeEventListener('beforeunload', flush as any);
-      document.removeEventListener('visibilitychange', onVisibility as any);
       if (scrollDebounceTimerRef.current) {
         window.clearTimeout(scrollDebounceTimerRef.current);
         scrollDebounceTimerRef.current = null;
@@ -872,8 +913,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         persistChatStateNowRef.current?.();
       } catch {}
     };
-    // Intentionally attach once; we rely on refs for latest state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Автоматическое сохранение состояния для текущего режима при изменениях

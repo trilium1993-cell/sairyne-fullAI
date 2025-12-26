@@ -154,6 +154,20 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
 
       // User authenticated! Save locally
       try {
+        // Ensure OS boot baseline gets persisted after login.
+        // Sometimes `sairyne_os_boot_id` isn't available at the exact moment of login; we request it and
+        // set `sairyne_last_os_boot_id` as soon as it arrives.
+        const ensureLastOsBootId = () => {
+          const osBootId =
+            safeGetItem("sairyne_os_boot_id") ||
+            (typeof window !== "undefined" ? window.localStorage?.getItem("sairyne_os_boot_id") ?? null : null);
+          if (osBootId) {
+            safeSetItem("sairyne_last_os_boot_id", osBootId);
+            return true;
+          }
+          return false;
+        };
+
         const osBootId =
           safeGetItem("sairyne_os_boot_id") ||
           (typeof window !== "undefined" ? window.localStorage?.getItem("sairyne_os_boot_id") ?? null : null);
@@ -176,6 +190,34 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
           localStorage.setItem('token', data.token);
           localStorage.setItem('user', JSON.stringify(data.user));
           localStorage.setItem('email', data.user.email);
+        }
+
+        // If OS boot id wasn't available yet, request it and set baseline when it arrives.
+        if (!ensureLastOsBootId()) {
+          try {
+            if (typeof window !== "undefined" && (window as any).loadFromJuce) {
+              (window as any).loadFromJuce("sairyne_os_boot_id");
+            }
+          } catch {}
+          const onDataLoaded = (e: any) => {
+            try {
+              if (e?.detail?.key === "sairyne_os_boot_id") {
+                ensureLastOsBootId();
+                window.removeEventListener("sairyne-data-loaded", onDataLoaded as any);
+              }
+            } catch {}
+          };
+          try {
+            if (typeof window !== "undefined") {
+              window.addEventListener("sairyne-data-loaded", onDataLoaded as any);
+              // Safety cleanup if host never delivers it.
+              window.setTimeout(() => {
+                try {
+                  window.removeEventListener("sairyne-data-loaded", onDataLoaded as any);
+                } catch {}
+              }, 5000);
+            }
+          } catch {}
         }
       } catch (e) {
         console.warn('[SignIn] Failed to persist auth via safeSetItem:', e);
