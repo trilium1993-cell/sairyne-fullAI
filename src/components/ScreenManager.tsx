@@ -333,6 +333,14 @@ export default function ScreenManager() {
       // Never persist "SignIn" as last step automatically; it can create sticky loops.
       // If user intentionally wants to stay on Sign In, we use PIN_SIGNIN_KEY instead.
       if (currentStep === "SignIn") return;
+      // Avoid thrashing: if we are already on Projects and not forced there by host restart, keep previous last_step.
+      if (
+        currentStep === "ChooseYourProject" &&
+        !forceProjectsRef.current &&
+        authedSinceRef.current !== null
+      ) {
+        return;
+      }
       safeSetItem(LAST_STEP_KEY, currentStep);
     } catch {
       // best-effort

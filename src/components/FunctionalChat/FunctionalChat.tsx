@@ -343,17 +343,48 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!isEmbedded) return;
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+    const modeKey = `${MODE_KEY}:${sessionKey}`;
+    const apply = (raw: string | null) => {
+      const v = String(raw || '').trim();
+      if (v === 'learn' || v === 'create' || v === 'pro') {
+        previousModeRef.current = v;
+        setSelectedLearnLevel(v);
+      }
+    };
+    try {
+      apply(safeGetItem(modeKey));
+    } catch {}
+    const onDataLoaded = (e: any) => {
+      try {
+        if (e?.detail?.key === modeKey) apply(e.detail.value);
+      } catch {}
+    };
+    try {
+      window.addEventListener('sairyne-data-loaded', onDataLoaded as any);
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('sairyne-data-loaded', onDataLoaded as any);
+      } catch {}
+    };
+  }, [isEmbedded, resolveActiveSessionKey]);
+
+  // Ensure new project sessions start in Learn if they have no messages.
+  useEffect(() => {
+    if (!isEmbedded) return;
+    const sessionKey = resolveActiveSessionKey();
+    if (!sessionKey) return;
     const hasPersisted = hasPersistedMessagesForSession(sessionKey);
     if (hasPersisted === false) {
       if (previousModeRef.current !== 'learn') {
         previousModeRef.current = 'learn';
         setSelectedLearnLevel('learn');
         try {
-          safeSetItem(MODE_KEY, 'learn');
+          safeSetItem(`${MODE_KEY}:${sessionKey}`, 'learn');
         } catch {}
       }
     }
-  }, [isEmbedded, hasPersistedMessagesForSession]);
+  }, [isEmbedded, hasPersistedMessagesForSession, resolveActiveSessionKey]);
 
   const resetUiToBlankSession = useCallback(() => {
     // Reset in-memory UI state so switching projects doesn't reuse previous project's chat
@@ -1808,7 +1839,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     setSelectedLearnLevel(level);
     // Persist the selected mode so the plugin can restore Pro after reload/reopen.
     try {
-      safeSetItem(MODE_KEY, level);
+      const sessionKey = resolveActiveSessionKey();
+      const key = sessionKey ? `${MODE_KEY}:${sessionKey}` : MODE_KEY;
+      safeSetItem(key, level);
     } catch {}
     
     console.log('[FunctionalChat] Mode switched to', level);
