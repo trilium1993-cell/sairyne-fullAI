@@ -3,6 +3,8 @@
  * Always uses JUCE for persistence, localStorage is only a UI cache
  */
 
+import { compressToBase64, decompressFromBase64 } from './lzString';
+
 const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
 
 // In-memory storage as fallback when localStorage is not available
@@ -164,6 +166,15 @@ export function safeGetItem(key: string): string | null {
   if (memoryStorage.has(key)) {
     const value = memoryStorage.get(key);
     if (IS_DEV) console.log('[Storage] ✅ Retrieved from memory:', key, value ? `value length: ${value.length}` : 'null');
+    if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+      try {
+        const decoded = decompressFromBase64(value.slice(3));
+        if (decoded) {
+          memoryStorage.set(key, decoded);
+          return decoded;
+        }
+      } catch {}
+    }
     return value || null;
   }
 
@@ -175,6 +186,15 @@ export function safeGetItem(key: string): string | null {
         if (IS_DEV) console.log('[Storage] ✅ Retrieved from localStorage cache:', key, `value length: ${value.length}`);
         // Also store in memory for faster access next time
         memoryStorage.set(key, value);
+        if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+          try {
+            const decoded = decompressFromBase64(value.slice(3));
+            if (decoded) {
+              memoryStorage.set(key, decoded);
+              return decoded;
+            }
+          } catch {}
+        }
         return value;
       }
     } catch (error) {
@@ -191,6 +211,15 @@ export function safeGetItem(key: string): string | null {
         if (IS_DEV) console.log('[Storage] ✅ Retrieved from window.__sairyneStorage:', key, `value length: ${value.length}`);
         // Store in memory for faster access
         memoryStorage.set(key, value);
+        if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+          try {
+            const decoded = decompressFromBase64(value.slice(3));
+            if (decoded) {
+              memoryStorage.set(key, decoded);
+              return decoded;
+            }
+          } catch {}
+        }
         return value;
       }
     }
@@ -244,11 +273,15 @@ export function safeSetItem(key: string, value: string): boolean {
       return true;
     }
 
-    // CRITICAL (Plugin stability): writing the full chat state (~60-70KB+) to JUCE can trigger
-    // WebView reloads (about:blank) in some hosts. In embedded mode, we keep chat-state in-memory
-    // (and localStorage cache) but do NOT persist it to JUCE at all.
+    // Embedded plugin stability: store chat state compressed before persisting to JUCE.
+    // This keeps payload small and avoids WKWebView reloads on large writes.
+    let juceValue = value;
     if (key === 'sairyne_functional_chat_state_v1' && isEmbeddedRuntime()) {
-      return true;
+      try {
+        juceValue = `lz:${compressToBase64(value)}`;
+      } catch {
+        juceValue = value;
+      }
     }
 
     // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
@@ -257,7 +290,7 @@ export function safeSetItem(key: string, value: string): boolean {
     if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
       // Embedded plugin stability: don't write large keys while the UI is active.
       // Instead, keep only the latest value and flush it when the WebView is hidden/unloaded.
-      pendingJuceSaveValue.set(key, value);
+      pendingJuceSaveValue.set(key, juceValue);
 
       // If the host is already hiding us, flush immediately.
       try {
@@ -288,7 +321,7 @@ export function safeSetItem(key: string, value: string): boolean {
 
     // If we already sent the same value very recently, skip.
     const lastVal = lastSentToJuceValue.get(key);
-    if (typeof lastVal === 'string' && lastVal === value && now - lastAt < 15000) {
+    if (typeof lastVal === 'string' && lastVal === juceValue && now - lastAt < 15000) {
       return true;
     }
 
@@ -306,9 +339,9 @@ export function safeSetItem(key: string, value: string): boolean {
         console.log('[Storage] ✅ window.saveToJuce is available, calling it NOW...');
         console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
       }
-      (window as any).saveToJuce(key, value);
+      (window as any).saveToJuce(key, juceValue);
       lastSentToJuceAt.set(key, now);
-      lastSentToJuceValue.set(key, value);
+      lastSentToJuceValue.set(key, juceValue);
       if (IS_DEV) console.log('[Storage] ✅ saveToJuce called for:', key);
     } else {
       if (IS_DEV) {
