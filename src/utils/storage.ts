@@ -17,6 +17,15 @@ const THROTTLED_JUCE_KEYS = new Set<string>([
   'sairyne_functional_chat_state_v1',
 ]);
 
+// Some keys are written by the app itself and can create event feedback loops in embedded hosts
+// (e.g. ScreenManager listens to `sairyne-data-loaded` and may react to our own writes).
+// For these keys, we persist, but we don't dispatch `sairyne-data-loaded`.
+const NO_DISPATCH_KEYS = new Set<string>([
+  'sairyne_functional_chat_state_v1',
+  'sairyne_ui_last_step',
+  'sairyne_web_build',
+]);
+
 // Track pending load requests to prevent infinite loops
 const pendingLoads: Set<string> = new Set();
 
@@ -237,6 +246,9 @@ export function safeSetItem(key: string, value: string): boolean {
   // Notify app/components immediately (used for reacting to selected project changes, etc.)
   if (typeof window !== 'undefined') {
     try {
+      if (NO_DISPATCH_KEYS.has(key)) {
+        return true;
+      }
       window.dispatchEvent(new CustomEvent('sairyne-data-loaded', {
         detail: { key, value }
       }));
