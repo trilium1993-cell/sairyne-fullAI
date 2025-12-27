@@ -7,13 +7,30 @@ import { saveDataToJuce } from "./services/audio/juceBridge";
 function installLocalStorageMirrorToJuce() {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
   try {
+    // IMPORTANT (Plugin stability):
+    // Do NOT mirror localStorage writes to JUCE once the real bridge exists.
+    // Otherwise we can create echo loops:
+    // JUCE -> onDataLoaded -> localStorage.setItem -> mirror -> saveDataToJuce -> JUCE ...
+    // This can cause save storms, WebView reloads (about:blank) and truncated AI responses.
+    const hasBridge = typeof (window as any)?.saveToJuce === "function";
+    if (hasBridge) return;
+
+    // Also avoid mirroring inside embedded iframes (plugin uses embed-chat.html).
+    const isEmbedded = (() => {
+      try {
+        return window.parent && window.parent !== window;
+      } catch {
+        return true;
+      }
+    })();
+    if (isEmbedded) return;
+
     const ALLOW = new Set([
       "sairyne_access_token",
       "sairyne_selected_project",
       "sairyne_projects",
       "sairyne_users",
       "sairyne_current_user",
-      "sairyne_functional_chat_state_v1",
       "sairyne_signin_draft_email",
     ]);
 
