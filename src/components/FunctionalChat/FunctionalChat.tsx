@@ -192,6 +192,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [completedStepText, setCompletedStepText] = useState("");
   const [showLearnMode, setShowLearnMode] = useState(false);
   const [selectedLearnLevel, setSelectedLearnLevel] = useState("learn");
+  const MODE_KEY = 'sairyne_chat_mode_v1';
   const [learnModeAIActive, setLearnModeAIActive] = useState(false); // Флаг для AI диалога в Learn mode
   const [showVisualTips, setShowVisualTips] = useState(false);
   const [showProjectAnalysis, setShowProjectAnalysis] = useState(false);
@@ -602,6 +603,33 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
     };
   }, []); // Только при монтировании
+
+  // Restore last selected chat mode in embedded plugin (Pro/Create/Learn).
+  // This avoids falling back to "learn" after a WebView reload.
+  useEffect(() => {
+    if (!isEmbedded) return;
+    const apply = (raw: string | null) => {
+      const v = String(raw || '').trim();
+      if (v === 'learn' || v === 'create' || v === 'pro') {
+        previousModeRef.current = v;
+        setSelectedLearnLevel(v);
+      }
+    };
+    try {
+      apply(safeGetItem(MODE_KEY));
+    } catch {}
+    const onDataLoaded = (e: any) => {
+      try {
+        if (e?.detail?.key === MODE_KEY) apply(e.detail.value);
+      } catch {}
+    };
+    try {
+      window.addEventListener('sairyne-data-loaded', onDataLoaded as any);
+      return () => window.removeEventListener('sairyne-data-loaded', onDataLoaded as any);
+    } catch {
+      return;
+    }
+  }, [isEmbedded]);
 
   // Scroll to show new AI message once, then let user scroll manually (like ChatGPT)
   const scrollToNewMessage = () => {
@@ -1253,28 +1281,32 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }
         
         // Persist pending AI request for this project session (best-effort).
-        try {
-          const sessionKey = resolveActiveSessionKey();
-          if (sessionKey) {
-            let root: any = {};
-            const existing = safeGetItem(CHAT_STATE_KEY);
-            if (existing) root = safeJsonParse<any>(existing, {}) || {};
-            if (!root || typeof root !== 'object') root = {};
-            if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
-            if (!root.sessions[sessionKey] || typeof root.sessions[sessionKey] !== 'object') {
-              root.sessions[sessionKey] = {};
+        // IMPORTANT: In embedded plugin hosts, persisting large chat state mid-request can cause save storms
+        // and WebView reloads (about:blank), which truncates AI responses. We skip pending persistence in embedded.
+        if (!isEmbedded) {
+          try {
+            const sessionKey = resolveActiveSessionKey();
+            if (sessionKey) {
+              let root: any = {};
+              const existing = safeGetItem(CHAT_STATE_KEY);
+              if (existing) root = safeJsonParse<any>(existing, {}) || {};
+              if (!root || typeof root !== 'object') root = {};
+              if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
+              if (!root.sessions[sessionKey] || typeof root.sessions[sessionKey] !== 'object') {
+                root.sessions[sessionKey] = {};
+              }
+              root.sessions[sessionKey].pendingAi = {
+                v: 1,
+                messageText,
+                mode: aiMode,
+                startedAt: Date.now(),
+                thinkingId,
+                conversationHistory,
+              };
+              safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
             }
-            root.sessions[sessionKey].pendingAi = {
-              v: 1,
-              messageText,
-              mode: aiMode,
-              startedAt: Date.now(),
-              thinkingId,
-              conversationHistory,
-            };
-            safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
-          }
-        } catch {}
+          } catch {}
+        }
 
         // In embedded hosts, persist once after staging the request (avoid autosave storms).
         if (isEmbedded) {
@@ -1756,6 +1788,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     
     previousModeRef.current = level;
     setSelectedLearnLevel(level);
+    // Persist the selected mode so the plugin can restore Pro after reload/reopen.
+    try {
+      safeSetItem(MODE_KEY, level);
+    } catch {}
     
     console.log('[FunctionalChat] Mode switched to', level);
   }, [messages, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText, showFixIssuesChat, scheduleReliableScrollRestore]);
