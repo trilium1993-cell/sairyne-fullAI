@@ -7,6 +7,15 @@ const IS_DEV = Boolean((import.meta as any)?.env?.DEV);
 
 // In-memory storage as fallback when localStorage is not available
 const memoryStorage: Map<string, string> = new Map();
+// Prevent save storms to the JUCE bridge (especially expensive keys like chat state).
+// We keep this entirely in-memory so it resets on page reload (which is fine).
+const lastSentToJuceAt: Map<string, number> = new Map();
+const lastSentToJuceValue: Map<string, string> = new Map();
+
+// Keys that can be very large and/or updated frequently.
+const THROTTLED_JUCE_KEYS = new Set<string>([
+  'sairyne_functional_chat_state_v1',
+]);
 
 // Track pending load requests to prevent infinite loops
 const pendingLoads: Set<string> = new Set();
@@ -149,6 +158,11 @@ export function safeGetItem(key: string): string | null {
  * Always saves to JUCE, localStorage is only a UI cache
  */
 export function safeSetItem(key: string, value: string): boolean {
+  // If value didn't change, do not spam JUCE persistence or event listeners.
+  // Still refresh memory cache to keep synchronous reads consistent.
+  const prev = memoryStorage.get(key);
+  const isSame = typeof prev === 'string' && prev === value;
+
   // Always store in memory first (for immediate access)
   memoryStorage.set(key, value);
   if (IS_DEV) {
@@ -158,8 +172,27 @@ export function safeSetItem(key: string, value: string): boolean {
     console.log('[Storage] 🔍 Is sairyne_projects?', key === 'sairyne_projects');
   }
 
-  // ALWAYS save to JUCE (this is the source of truth)
+  // ALWAYS save to JUCE (this is the source of truth), but guard against storms.
   try {
+    // Deduplicate identical values: skip JUCE write + skip emitting events.
+    if (isSame) {
+      return true;
+    }
+
+    // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
+    const now = Date.now();
+    const lastAt = lastSentToJuceAt.get(key) ?? 0;
+    if (THROTTLED_JUCE_KEYS.has(key) && now - lastAt < 3500) {
+      // Still update local cache, but don't hammer the native bridge.
+      return true;
+    }
+
+    // If we already sent the same value very recently, skip.
+    const lastVal = lastSentToJuceValue.get(key);
+    if (typeof lastVal === 'string' && lastVal === value && now - lastAt < 15000) {
+      return true;
+    }
+
     if (IS_DEV) {
       console.log('[Storage] 🔄 Saving to JUCE PropertiesFile:', key, `value length: ${value.length}`);
       console.log('[Storage] 📦 Value preview (first 100 chars):', value.substring(0, 100));
@@ -175,6 +208,8 @@ export function safeSetItem(key: string, value: string): boolean {
         console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
       }
       (window as any).saveToJuce(key, value);
+      lastSentToJuceAt.set(key, now);
+      lastSentToJuceValue.set(key, value);
       if (IS_DEV) console.log('[Storage] ✅ saveToJuce called for:', key);
     } else {
       if (IS_DEV) {
