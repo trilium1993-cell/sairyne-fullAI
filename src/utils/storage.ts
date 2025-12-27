@@ -11,11 +11,26 @@ const memoryStorage: Map<string, string> = new Map();
 // We keep this entirely in-memory so it resets on page reload (which is fine).
 const lastSentToJuceAt: Map<string, number> = new Map();
 const lastSentToJuceValue: Map<string, string> = new Map();
+const pendingJuceSaveTimer: Map<string, number> = new Map();
+const pendingJuceSaveValue: Map<string, string> = new Map();
 
 // Keys that can be very large and/or updated frequently.
 const THROTTLED_JUCE_KEYS = new Set<string>([
   'sairyne_functional_chat_state_v1',
 ]);
+
+function isEmbeddedRuntime(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.self !== window.top ||
+      window.location.pathname?.toLowerCase().includes('embed-chat') ||
+      window.location.search?.toLowerCase().includes('embed=1')
+    );
+  } catch {
+    return true;
+  }
+}
 
 // Some keys are written by the app itself and can create event feedback loops in embedded hosts
 // (e.g. ScreenManager listens to `sairyne-data-loaded` and may react to our own writes).
@@ -191,8 +206,38 @@ export function safeSetItem(key: string, value: string): boolean {
     // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
     const now = Date.now();
     const lastAt = lastSentToJuceAt.get(key) ?? 0;
+    if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
+      // Debounce heavy keys in embedded mode: collapse rapid updates into a single write.
+      // This prevents JUCE save storms that can freeze WKWebView and cause reload loops.
+      pendingJuceSaveValue.set(key, value);
+      const existingTimer = pendingJuceSaveTimer.get(key);
+      if (existingTimer) {
+        try {
+          window.clearTimeout(existingTimer);
+        } catch {}
+      }
+      const t = window.setTimeout(() => {
+        try {
+          const latest = pendingJuceSaveValue.get(key);
+          if (typeof latest !== 'string') return;
+          if (typeof (window as any)?.saveToJuce === 'function') {
+            (window as any).saveToJuce(key, latest);
+            lastSentToJuceAt.set(key, Date.now());
+            lastSentToJuceValue.set(key, latest);
+          }
+        } catch (e) {
+          console.error('[Storage] ❌ Debounced JUCE save failed:', e);
+        } finally {
+          pendingJuceSaveTimer.delete(key);
+          pendingJuceSaveValue.delete(key);
+        }
+      }, 1200);
+      pendingJuceSaveTimer.set(key, t);
+      return true;
+    }
+
+    // Non-embedded: cheap throttle is fine.
     if (THROTTLED_JUCE_KEYS.has(key) && now - lastAt < 3500) {
-      // Still update local cache, but don't hammer the native bridge.
       return true;
     }
 
