@@ -174,6 +174,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const messagesRef = useRef<Message[]>([]);
   const lastSendAtRef = useRef(0);
   const aiRequestInFlightRef = useRef(false);
+  const lastPersistAtRef = useRef(0);
   const learnAnalysisSeqRef = useRef(0);
   const [currentStep, setCurrentStep] = useState(0);
   const [projectName, setProjectName] = useState("New Project");
@@ -800,6 +801,17 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const persistChatStateNow = useCallback(() => {
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+
+    // IMPORTANT (Plugin stability): throttling writes to the JUCE bridge.
+    // In embedded hosts, frequent large writes can freeze WKWebView and cause reload loops.
+    try {
+      const now = Date.now();
+      const isHidden = typeof document !== 'undefined' ? Boolean(document.hidden) : false;
+      if (isEmbedded && !isHidden && now - lastPersistAtRef.current < 4000) {
+        return;
+      }
+      lastPersistAtRef.current = now;
+    } catch {}
 
     // Ensure active mode state includes the latest scroll position (even if user only scrolled).
     const activeMode = previousModeRef.current || selectedLearnLevel || 'learn';
