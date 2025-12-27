@@ -244,6 +244,13 @@ export function safeSetItem(key: string, value: string): boolean {
       return true;
     }
 
+    // CRITICAL (Plugin stability): writing the full chat state (~60-70KB+) to JUCE can trigger
+    // WebView reloads (about:blank) in some hosts. In embedded mode, we keep chat-state in-memory
+    // (and localStorage cache) but do NOT persist it to JUCE at all.
+    if (key === 'sairyne_functional_chat_state_v1' && isEmbeddedRuntime()) {
+      return true;
+    }
+
     // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
     const now = Date.now();
     const lastAt = lastSentToJuceAt.get(key) ?? 0;
