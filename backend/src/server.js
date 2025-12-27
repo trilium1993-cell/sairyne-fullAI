@@ -16,7 +16,9 @@ if (isDevelopment) {
   console.log("🌀 Sairyne backend restarting — fresh CORS build");
 }
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Keep local dev consistent with project docs/env.example (3001).
+// PaaS (Render/Railway) will inject PORT, so this default is only for local runs.
+const PORT = process.env.PORT || 3001;
 
 // Initialize email service
 await emailService.initialize();

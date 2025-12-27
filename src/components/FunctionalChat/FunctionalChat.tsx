@@ -662,16 +662,26 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Resume AI requests that were in-flight when the plugin UI was closed.
   const resumeAttemptedRef = useRef<Record<string, boolean>>({});
+  const mountedAtRef = useRef(Date.now());
   const [showResumeBanner, setShowResumeBanner] = useState(false);
   const resumeLastRequest = useCallback(() => {
     const sessionKey = resolveActiveSessionKey();
-    if (!sessionKey) return;
+    if (!sessionKey) {
+      setShowResumeBanner(false);
+      return;
+    }
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
-      if (!raw) return;
+      if (!raw) {
+        setShowResumeBanner(false);
+        return;
+      }
       const root = safeJsonParse<any>(raw, null);
       const pending = root?.sessions?.[sessionKey]?.pendingAi;
-      if (!pending) return;
+      if (!pending) {
+        setShowResumeBanner(false);
+        return;
+      }
 
       const thinkingId = String(pending.thinkingId || `ai-thinking-${Date.now()}`);
 
@@ -689,6 +699,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               }
             }
           } catch {}
+          // We successfully rehydrated the response; hide the banner.
+          setShowResumeBanner(false);
         });
         return;
       }
@@ -725,6 +737,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                 }
               }
             } catch {}
+            // Resume succeeded; hide the banner.
+            setShowResumeBanner(false);
           });
         })
         .catch(() => {
@@ -739,6 +753,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!sessionKey) return;
     if (!isProjectSessionReady) return;
     if (resumeAttemptedRef.current[sessionKey]) return;
+    // Don't auto-resume while a request is actively in-flight in this UI instance.
+    if (aiRequestInFlightRef.current) return;
 
     try {
       const raw = safeGetItem(CHAT_STATE_KEY);
@@ -746,6 +762,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const root = safeJsonParse<any>(raw, null);
       const pending = root?.sessions?.[sessionKey]?.pendingAi;
       if (!pending || typeof pending.messageText !== 'string' || typeof pending.mode !== 'string') return;
+
+      // Only auto-resume requests that predate this UI mount.
+      // We also persist `pendingAi` for *current* Pro requests; we must not treat those as "interrupted".
+      if (typeof pending.startedAt === 'number' && pending.startedAt >= mountedAtRef.current - 1000) {
+        return;
+      }
 
       // Mark attempt so we don't loop.
       resumeAttemptedRef.current[sessionKey] = true;
@@ -756,7 +778,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     } catch {
       // ignore
     }
-  }, [isProjectSessionReady, messages, selectedLearnLevel]);
+  }, [isProjectSessionReady, resumeLastRequest]);
 
   // Persist chat state (debounced) so AU/VST3 window reload doesn't wipe it
   const persistChatStateNow = useCallback(() => {

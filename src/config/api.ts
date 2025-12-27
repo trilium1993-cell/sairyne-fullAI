@@ -7,12 +7,16 @@
 
 /**
  * Base API URL
- * - Development: http://localhost:8000
+ * - Development: http://localhost:3001 (or whatever VITE_API_URL is set to)
  * - Production: Your deployed backend URL (Railway/Render)
  */
 const RENDER_API_BASE = 'https://sairyne-fullai-5.onrender.com';
 
 function inferApiBase(): string {
+  // `import.meta.env` is provided by Vite in the browser build. In plain Node (or some tooling),
+  // it can be undefined, so access it defensively.
+  const fromEnv = (import.meta as any)?.env?.VITE_API_URL as string | undefined;
+
   if (typeof window !== 'undefined') {
     const { protocol, hostname } = window.location;
 
@@ -29,14 +33,14 @@ function inferApiBase(): string {
 
     // If running locally (dev/proxy), prefer local backend explicitly.
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://127.0.0.1:8000';
+      // Prefer .env(.local) override if provided; otherwise default to 3001.
+      return fromEnv || 'http://127.0.0.1:3001';
     }
 
     // Default production fallback
     return RENDER_API_BASE;
   }
 
-  const fromEnv = import.meta.env.VITE_API_URL;
   if (fromEnv) return fromEnv;
 
   // SSR/unknown: keep relative
@@ -45,7 +49,7 @@ function inferApiBase(): string {
 
 export const API_URL = inferApiBase();
 
-if (import.meta.env.DEV) {
+if ((import.meta as any)?.env?.DEV) {
   console.debug('[config] API_URL:', API_URL);
 }
 

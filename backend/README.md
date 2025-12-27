@@ -26,7 +26,8 @@ Required variables in Railway:
 ```
 OPENAI_API_KEY=sk-...your-openai-key
 PORT=3001
-CORS_ORIGIN=https://your-frontend.vercel.app
+ # Comma-separated list of allowed origins (used when strict CORS mode is enabled)
+ CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:5173
 FRONTEND_URL=https://your-frontend.vercel.app
 ```
 

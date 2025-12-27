@@ -82,7 +82,7 @@ src/
 
 ### Backend (Render)
 1. Follow [Render Deployment Guide](./RENDER_DEPLOYMENT.md)
-2. Set environment variables (OPENAI_API_KEY, CORS_ORIGIN)
+2. Set environment variables (OPENAI_API_KEY, CORS_ORIGINS)
 3. Update VITE_API_URL on Vercel
 
 [Deploy Now →](https://vercel.com/new)

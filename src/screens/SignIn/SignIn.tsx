@@ -73,6 +73,8 @@ export const SignIn = ({ onNext }: SignInProps): JSX.Element => {
       // To maximize robustness inside Ableton/Logic, try a small set of known-good bases.
       const rawBases = [
         API_URL, // can be '' on Vercel to force same-origin /api proxy
+        'http://127.0.0.1:3001',
+        'http://localhost:3001',
         'http://127.0.0.1:8000',
         'http://localhost:8000',
         'https://sairyne-fullai-5.onrender.com',
