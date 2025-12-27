@@ -97,6 +97,15 @@ if (typeof window !== 'undefined') {
 if (typeof window !== 'undefined' && (window as any).__sairyneStorage) {
   const windowStorage = (window as any).__sairyneStorage as Map<string, string>;
   windowStorage.forEach((value, key) => {
+    if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+      try {
+        const decoded = decompressFromBase64(value.slice(3));
+        if (decoded) {
+          memoryStorage.set(key, decoded);
+          return;
+        }
+      } catch {}
+    }
     memoryStorage.set(key, value);
     if (IS_DEV) console.log('[Storage] 🔄 Initialized from __sairyneStorage:', key);
   });
@@ -107,11 +116,21 @@ function syncFromWindowStorage() {
   if (typeof window !== 'undefined' && (window as any).__sairyneStorage) {
     const windowStorage = (window as any).__sairyneStorage as Map<string, string>;
     windowStorage.forEach((value, key) => {
-      // JUCE-injected data is the source of truth. If the injected value differs,
-      // overwrite any cached memory value (important for runtime boot id).
+      // JUCE-injected data is the source of truth.
+      // But for chat-state we store it compressed in JUCE; decode it before putting into memory
+      // so the rest of the app always sees JSON.
+      let normalized = value;
+      if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+        try {
+          const decoded = decompressFromBase64(value.slice(3));
+          if (decoded) normalized = decoded;
+        } catch {}
+      }
+
+      // If the injected value differs, overwrite any cached memory value (important for runtime boot id).
       const existing = memoryStorage.get(key);
-      if (existing !== value) {
-        memoryStorage.set(key, value);
+      if (existing !== normalized) {
+        memoryStorage.set(key, normalized);
         if (IS_DEV) console.log('[Storage] 🔄 Synced from __sairyneStorage (overwrite):', key);
       }
     });
