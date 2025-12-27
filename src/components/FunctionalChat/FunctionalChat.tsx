@@ -194,6 +194,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [selectedLearnLevel, setSelectedLearnLevel] = useState("learn");
   const MODE_KEY = 'sairyne_chat_mode_v1';
   const lastModeWriteAtRef = useRef(0);
+  // Track per-session mode initialization to avoid repeatedly resetting mode (learn/pro ping-pong)
+  const modeInitializedRef = useRef<Record<string, boolean>>({});
   const [learnModeAIActive, setLearnModeAIActive] = useState(false); // Флаг для AI диалога в Learn mode
   const [showVisualTips, setShowVisualTips] = useState(false);
   const [showProjectAnalysis, setShowProjectAnalysis] = useState(false);
@@ -350,6 +352,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       if (v === 'learn' || v === 'create' || v === 'pro') {
         // Ignore stale remote writes that arrive immediately after a local change.
         if (lastModeWriteAtRef.current && Date.now() - lastModeWriteAtRef.current < 1500) return;
+        modeInitializedRef.current[sessionKey] = true;
         previousModeRef.current = v;
         setSelectedLearnLevel(v);
       }
@@ -378,7 +381,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
     const hasPersisted = hasPersistedMessagesForSession(sessionKey);
-    if (hasPersisted === false) {
+    if (hasPersisted === false && !modeInitializedRef.current[sessionKey]) {
       if (previousModeRef.current !== 'learn') {
         previousModeRef.current = 'learn';
         setSelectedLearnLevel('learn');
@@ -386,6 +389,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           safeSetItem(`${MODE_KEY}:${sessionKey}`, 'learn');
         } catch {}
       }
+      modeInitializedRef.current[sessionKey] = true;
     }
   }, [isEmbedded, hasPersistedMessagesForSession, resolveActiveSessionKey]);
 
