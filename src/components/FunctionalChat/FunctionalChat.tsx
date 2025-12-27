@@ -687,21 +687,37 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // If we already have a received response, just render it again (no network).
       if (typeof pending.responseText === 'string' && pending.responseText.length > 0) {
-        setMessages((prev) => prev.filter((m) => !(m as any).isThinking && !(m as any).isTyping));
-        addAIMessage(String(pending.responseText), () => {
-          try {
-            const existing = safeGetItem(CHAT_STATE_KEY);
-            if (existing) {
-              const root2 = safeJsonParse<any>(existing, {}) || {};
-              if (root2?.sessions?.[sessionKey]) {
-                delete root2.sessions[sessionKey].pendingAi;
-                safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
-              }
-            }
-          } catch {}
-          // We successfully rehydrated the response; hide the banner.
-          setShowResumeBanner(false);
+        // IMPORTANT (Plugin stability): Do NOT re-run the word-by-word typing animation on reopen.
+        // Large responses can freeze WKWebView/JUCE while we "re-type" them.
+        const text = String(pending.responseText);
+        const aiMessage: Message = {
+          id: `ai-${Date.now()}`,
+          type: 'ai',
+          content: text,
+          timestamp: Date.now(),
+          isTyping: false,
+          isThinking: false,
+        };
+
+        setMessages((prev) => {
+          const cleaned = prev.filter((m) => !(m as any).isThinking && !(m as any).isTyping);
+          return [...cleaned, aiMessage];
         });
+        setTimeout(() => scrollToNewMessage(), 50);
+
+        // Clear pendingAi immediately so we don't keep trying to "resume" the same response.
+        try {
+          const existing = safeGetItem(CHAT_STATE_KEY);
+          if (existing) {
+            const root2 = safeJsonParse<any>(existing, {}) || {};
+            if (root2?.sessions?.[sessionKey]) {
+              delete root2.sessions[sessionKey].pendingAi;
+              safeSetItem(CHAT_STATE_KEY, JSON.stringify(root2));
+            }
+          }
+        } catch {}
+
+        setShowResumeBanner(false);
         return;
       }
 
