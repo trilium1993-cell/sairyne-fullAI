@@ -193,6 +193,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [showLearnMode, setShowLearnMode] = useState(false);
   const [selectedLearnLevel, setSelectedLearnLevel] = useState("learn");
   const MODE_KEY = 'sairyne_chat_mode_v1';
+  const lastModeWriteAtRef = useRef(0);
   const [learnModeAIActive, setLearnModeAIActive] = useState(false); // Флаг для AI диалога в Learn mode
   const [showVisualTips, setShowVisualTips] = useState(false);
   const [showProjectAnalysis, setShowProjectAnalysis] = useState(false);
@@ -347,6 +348,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const apply = (raw: string | null) => {
       const v = String(raw || '').trim();
       if (v === 'learn' || v === 'create' || v === 'pro') {
+        // Ignore stale remote writes that arrive immediately after a local change.
+        if (lastModeWriteAtRef.current && Date.now() - lastModeWriteAtRef.current < 1500) return;
         previousModeRef.current = v;
         setSelectedLearnLevel(v);
       }
@@ -1842,6 +1845,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const sessionKey = resolveActiveSessionKey();
       const key = sessionKey ? `${MODE_KEY}:${sessionKey}` : MODE_KEY;
       safeSetItem(key, level);
+      lastModeWriteAtRef.current = Date.now();
     } catch {}
     
     console.log('[FunctionalChat] Mode switched to', level);
