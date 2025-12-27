@@ -32,6 +32,47 @@ function isEmbeddedRuntime(): boolean {
   }
 }
 
+function flushPendingJuceSaves(): void {
+  try {
+    if (typeof window === 'undefined') return;
+    if (typeof (window as any)?.saveToJuce !== 'function') return;
+    pendingJuceSaveValue.forEach((val, key) => {
+      try {
+        (window as any).saveToJuce(key, val);
+        lastSentToJuceAt.set(key, Date.now());
+        lastSentToJuceValue.set(key, val);
+      } catch (e) {
+        console.error('[Storage] ❌ flushPendingJuceSaves failed for key:', key, e);
+      }
+    });
+  } catch (e) {
+    console.error('[Storage] ❌ flushPendingJuceSaves failed:', e);
+  } finally {
+    try {
+      pendingJuceSaveTimer.forEach((t) => {
+        try {
+          window.clearTimeout(t);
+        } catch {}
+      });
+    } catch {}
+    pendingJuceSaveTimer.clear();
+    pendingJuceSaveValue.clear();
+  }
+}
+
+// In embedded plugin hosts, flush any pending heavy writes when the page is being hidden/unloaded.
+if (typeof window !== 'undefined') {
+  try {
+    window.addEventListener('pagehide', () => flushPendingJuceSaves());
+    window.addEventListener('beforeunload', () => flushPendingJuceSaves());
+    document.addEventListener('visibilitychange', () => {
+      try {
+        if (document.hidden) flushPendingJuceSaves();
+      } catch {}
+    });
+  } catch {}
+}
+
 // Some keys are written by the app itself and can create event feedback loops in embedded hosts
 // (e.g. ScreenManager listens to `sairyne-data-loaded` and may react to our own writes).
 // For these keys, we persist, but we don't dispatch `sairyne-data-loaded`.
@@ -207,9 +248,19 @@ export function safeSetItem(key: string, value: string): boolean {
     const now = Date.now();
     const lastAt = lastSentToJuceAt.get(key) ?? 0;
     if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
-      // Debounce heavy keys in embedded mode: collapse rapid updates into a single write.
-      // This prevents JUCE save storms that can freeze WKWebView and cause reload loops.
+      // Embedded plugin stability: don't write large keys while the UI is active.
+      // Instead, keep only the latest value and flush it when the WebView is hidden/unloaded.
       pendingJuceSaveValue.set(key, value);
+
+      // If the host is already hiding us, flush immediately.
+      try {
+        if (typeof document !== 'undefined' && document.hidden) {
+          flushPendingJuceSaves();
+          return true;
+        }
+      } catch {}
+
+      // Otherwise schedule a very lazy flush (acts as a safety net).
       const existingTimer = pendingJuceSaveTimer.get(key);
       if (existingTimer) {
         try {
@@ -217,21 +268,8 @@ export function safeSetItem(key: string, value: string): boolean {
         } catch {}
       }
       const t = window.setTimeout(() => {
-        try {
-          const latest = pendingJuceSaveValue.get(key);
-          if (typeof latest !== 'string') return;
-          if (typeof (window as any)?.saveToJuce === 'function') {
-            (window as any).saveToJuce(key, latest);
-            lastSentToJuceAt.set(key, Date.now());
-            lastSentToJuceValue.set(key, latest);
-          }
-        } catch (e) {
-          console.error('[Storage] ❌ Debounced JUCE save failed:', e);
-        } finally {
-          pendingJuceSaveTimer.delete(key);
-          pendingJuceSaveValue.delete(key);
-        }
-      }, 1200);
+        flushPendingJuceSaves();
+      }, 15000);
       pendingJuceSaveTimer.set(key, t);
       return true;
     }

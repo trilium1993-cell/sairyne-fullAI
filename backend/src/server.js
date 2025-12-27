@@ -230,7 +230,9 @@ app.post('/api/chat/message', chatLimiter, async (req, res) => {
       model: 'gpt-4',
       messages: messages,
       temperature: 0.7,
-      max_tokens: 300
+      // Increase response budget; small values cause "cut off" answers that look like truncated output.
+      // Keep this moderate to avoid runaway costs.
+      max_tokens: 800
     });
 
     const aiResponse = completion.choices[0].message.content;
@@ -295,7 +297,7 @@ app.post('/api/chat/analyze-learn-context', chatLimiter, async (req, res) => {
       model: 'gpt-4',
       messages: messages,
       temperature: 0.8,
-      max_tokens: 400
+      max_tokens: 800
     });
 
     const aiResponse = completion.choices[0].message.content;
