@@ -17,9 +17,9 @@ const pendingJuceSaveTimer: Map<string, number> = new Map();
 const pendingJuceSaveValue: Map<string, string> = new Map();
 
 // Keys that can be very large and/or updated frequently.
-const THROTTLED_JUCE_KEYS = new Set<string>([
-  'sairyne_functional_chat_state_v1',
-]);
+// NOTE: chat-state is handled with special logic in embedded mode (compressed + short debounce),
+// so we don't include it here.
+const THROTTLED_JUCE_KEYS = new Set<string>([]);
 
 function isEmbeddedRuntime(): boolean {
   try {
@@ -276,7 +276,9 @@ export function safeSetItem(key: string, value: string): boolean {
     // Embedded plugin stability: store chat state compressed before persisting to JUCE.
     // This keeps payload small and avoids WKWebView reloads on large writes.
     let juceValue = value;
-    if (key === 'sairyne_functional_chat_state_v1' && isEmbeddedRuntime()) {
+    const isChatState = key === 'sairyne_functional_chat_state_v1';
+    const isEmbedded = isEmbeddedRuntime();
+    if (isChatState && isEmbedded) {
       try {
         juceValue = `lz:${compressToBase64(value)}`;
       } catch {
@@ -284,23 +286,49 @@ export function safeSetItem(key: string, value: string): boolean {
       }
     }
 
+    // Chat state must be saved reliably even if the host closes the UI without firing pagehide/visibilitychange.
+    // Use a very short debounce in embedded mode (so we don't spam), but we still persist within ~500ms.
+    if (isChatState && isEmbedded) {
+      const now = Date.now();
+      const lastAt = lastSentToJuceAt.get(key) ?? 0;
+      const lastVal = lastSentToJuceValue.get(key);
+      if (typeof lastVal === 'string' && lastVal === juceValue && now - lastAt < 15000) {
+        return true;
+      }
+
+      // Coalesce rapid updates into a single write soon.
+      pendingJuceSaveValue.set(key, juceValue);
+      const existingTimer = pendingJuceSaveTimer.get(key);
+      if (existingTimer) {
+        try {
+          window.clearTimeout(existingTimer);
+        } catch {}
+      }
+      const t = window.setTimeout(() => {
+        try {
+          const latest = pendingJuceSaveValue.get(key);
+          if (typeof latest !== 'string') return;
+          if (typeof (window as any)?.saveToJuce === 'function') {
+            (window as any).saveToJuce(key, latest);
+            lastSentToJuceAt.set(key, Date.now());
+            lastSentToJuceValue.set(key, latest);
+          }
+        } catch (e) {
+          console.error('[Storage] ❌ Debounced chat-state JUCE save failed:', e);
+        } finally {
+          pendingJuceSaveTimer.delete(key);
+          pendingJuceSaveValue.delete(key);
+        }
+      }, 500);
+      pendingJuceSaveTimer.set(key, t);
+      return true;
+    }
+
     // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
     const now = Date.now();
     const lastAt = lastSentToJuceAt.get(key) ?? 0;
     if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
-      // Embedded plugin stability: don't write large keys while the UI is active.
-      // Instead, keep only the latest value and flush it when the WebView is hidden/unloaded.
       pendingJuceSaveValue.set(key, juceValue);
-
-      // If the host is already hiding us, flush immediately.
-      try {
-        if (typeof document !== 'undefined' && document.hidden) {
-          flushPendingJuceSaves();
-          return true;
-        }
-      } catch {}
-
-      // Otherwise schedule a very lazy flush (acts as a safety net).
       const existingTimer = pendingJuceSaveTimer.get(key);
       if (existingTimer) {
         try {

@@ -20,7 +20,7 @@ export default function ScreenManager() {
   const LAST_STEP_KEY = "sairyne_ui_last_step";
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
   const BUILD_KEY = "sairyne_web_build";
-  const BUILD_TAG = "fix-chatstate-compress-1";
+  const BUILD_TAG = "fix-chatstate-compress-save-1";
 
   // JUCE-side persistence currently rejects empty values (see Sairyne.log).
   // Use a non-empty tombstone for "clearing" persisted keys.
