@@ -854,6 +854,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // We attach/re-attach the scroll listener when the underlying DOM node becomes available.
   const attachedScrollElRef = useRef<HTMLDivElement | null>(null);
   const scrollCleanupRef = useRef<(() => void) | null>(null);
+  const lastScrollPersistAtRef = useRef(0);
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -864,9 +865,18 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         if (st) {
           modeStatesRef.current[mode] = { ...st, scrollPosition: el.scrollTop };
         }
+        // IMPORTANT (Plugin stability): In embedded JUCE WebViews, persisting the full chat state on scroll
+        // can spam the native bridge and freeze the UI (scroll events can fire frequently during layout/typing).
+        // Keep scroll position in-memory; persist only on explicit flush events (pagehide/beforeunload/hidden).
+        if (isEmbedded) return;
+
         if (scrollDebounceTimerRef.current) window.clearTimeout(scrollDebounceTimerRef.current);
         scrollDebounceTimerRef.current = window.setTimeout(() => {
           try {
+            // Extra throttle: avoid writing large chat state too often even on web.
+            const now = Date.now();
+            if (now - lastScrollPersistAtRef.current < 2000) return;
+            lastScrollPersistAtRef.current = now;
             persistChatStateNowRef.current?.();
           } catch {}
         }, 250);
