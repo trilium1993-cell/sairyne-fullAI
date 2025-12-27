@@ -1,12 +1,17 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { saveDataToJuce } from "./services/audio/juceBridge";
+import { resolveIsEmbedded } from "./utils/embed";
 
 // Mirror sairyne_* localStorage writes into JUCE persistence (critical for AU/WKWebView)
 // This runs inside the iframe/web app context, so it catches app writes reliably.
 function installLocalStorageMirrorToJuce() {
   if (typeof window === "undefined" || typeof window.localStorage === "undefined") return;
   try {
+    // Never mirror inside the plugin/embed build. The JUCE bridge + safeSetItem handle persistence.
+    // Mirroring here can create echo loops (JUCE -> localStorage.setItem -> mirror -> JUCE) and reloads.
+    if (resolveIsEmbedded()) return;
+
     // IMPORTANT (Plugin stability):
     // Do NOT mirror localStorage writes to JUCE once the real bridge exists.
     // Otherwise we can create echo loops:
@@ -14,16 +19,6 @@ function installLocalStorageMirrorToJuce() {
     // This can cause save storms, WebView reloads (about:blank) and truncated AI responses.
     const hasBridge = typeof (window as any)?.saveToJuce === "function";
     if (hasBridge) return;
-
-    // Also avoid mirroring inside embedded iframes (plugin uses embed-chat.html).
-    const isEmbedded = (() => {
-      try {
-        return window.parent && window.parent !== window;
-      } catch {
-        return true;
-      }
-    })();
-    if (isEmbedded) return;
 
     const ALLOW = new Set([
       "sairyne_access_token",
