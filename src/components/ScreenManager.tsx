@@ -20,7 +20,7 @@ export default function ScreenManager() {
   const LAST_STEP_KEY = "sairyne_ui_last_step";
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
   const BUILD_KEY = "sairyne_web_build";
-  const BUILD_TAG = "fix-resume-chat-in-embed-1";
+  const BUILD_TAG = "fix-host-restart-resume-rules-1";
 
   // JUCE-side persistence currently rejects empty values (see Sairyne.log).
   // Use a non-empty tombstone for "clearing" persisted keys.
@@ -90,20 +90,22 @@ export default function ScreenManager() {
       return "SignIn";
     }
 
-    // Host boot detection:
-    // IMPORTANT: In embedded WebViews, the "runtime boot id" is injected at page load and can change
-    // on every WebView reload. Treating that as a DAW/host restart causes the UI to never resume chat.
-    // Therefore, only use this heuristic in non-embedded (browser) contexts.
-    if (!isEmbedded) {
-      const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
-      const lastBootId = safeGetItem("sairyne_last_boot_id");
-      if (runtimeBootId && runtimeBootId !== lastBootId) {
-        // Host restart should also clear any "pinned Sign In" (it is intended for a live session account switch).
-        safeSetItem(PIN_SIGNIN_KEY, TOMBSTONE);
-        // Persist for next opens within the same host process.
-        safeSetItem("sairyne_last_boot_id", runtimeBootId);
-        return "ChooseYourProject";
-      }
+    // Host boot detection (Ableton/DAW restart):
+    // Requirement:
+    // - OS reboot => SignIn (handled above by osBootId/lastOsBootId)
+    // - Host restart WITHOUT OS reboot => force "Your Projects" (NOT chat), even if last screen was chat.
+    // - Same host session (plugin window reopened) => resume last screen via LAST_STEP_KEY.
+    //
+    // We compare a runtime boot id injected by C++ to the last seen boot id persisted in PropertiesFile.
+    // NOTE: this must be stable for the host process; if it changes every WebView reload, the C++ side must be fixed.
+    const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
+    const lastBootId = safeGetItem("sairyne_last_boot_id");
+    if (runtimeBootId && runtimeBootId !== lastBootId) {
+      // Host restart should also clear any "pinned Sign In" (it is intended for a live session account switch).
+      safeSetItem(PIN_SIGNIN_KEY, TOMBSTONE);
+      // Persist for next opens within the same host process.
+      safeSetItem("sairyne_last_boot_id", runtimeBootId);
+      return "ChooseYourProject";
     }
 
     // Same DAW session (no host restart): resume last screen when reopening the plugin window.
@@ -235,9 +237,8 @@ export default function ScreenManager() {
       // Prevent repeated boot-id writes / flip-flopping.
       // Once we have handled a "new host boot" decision, we can continue normal logic.
       if (!bootHandledRef.current) {
-        // Same caveat as above: in embedded, runtime boot id is not a reliable "host restart" signal.
-        const runtimeBootId = isEmbedded ? null : safeGetItem("sairyne_runtime_boot_id");
-        const lastBootId = isEmbedded ? null : safeGetItem("sairyne_last_boot_id");
+        const runtimeBootId = safeGetItem("sairyne_runtime_boot_id");
+        const lastBootId = safeGetItem("sairyne_last_boot_id");
 
         // If we're authenticated but runtime boot id hasn't arrived yet, wait briefly
         // so we don't accidentally auto-resume chat before the host-boot decision is known.
@@ -253,7 +254,7 @@ export default function ScreenManager() {
           return;
         }
 
-        if (!isEmbedded && runtimeBootId && runtimeBootId !== lastBootId) {
+        if (runtimeBootId && runtimeBootId !== lastBootId) {
           bootHandledRef.current = true;
           forceProjectsRef.current = true;
           manualStayOnProjectsRef.current = true;
@@ -264,7 +265,7 @@ export default function ScreenManager() {
           safeSetItem("sairyne_last_boot_id", runtimeBootId);
           return;
         }
-        if (!isEmbedded && runtimeBootId && runtimeBootId === lastBootId) {
+        if (runtimeBootId && runtimeBootId === lastBootId) {
           bootHandledRef.current = true;
         }
       }
