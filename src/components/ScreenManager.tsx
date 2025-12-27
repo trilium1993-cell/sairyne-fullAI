@@ -4,11 +4,13 @@ import { getScreenComponent } from "../flow/registry";
 import { safeGetItem, safeSetItem } from "../utils/storage";
 import { getSelectedProject } from "../services/projects";
 import { setGlobalLoading } from "../services/loadingService";
+import { resolveIsEmbedded } from "../utils/embed";
 
 export default function ScreenManager() {
   const [currentStep, setCurrentStep] = useState<Step>("SignIn");
   const [history, setHistory] = useState<Step[]>([]);
   const [isOsGatePending, setIsOsGatePending] = useState(false);
+  const isEmbedded = resolveIsEmbedded();
   const lastAutoStepRef = useRef<Step | null>(null);
   const manualStayOnProjectsRef = useRef(false);
   const manualStayOnSignInRef = useRef(false);
@@ -17,6 +19,8 @@ export default function ScreenManager() {
   const forceProjectsRef = useRef(false);
   const LAST_STEP_KEY = "sairyne_ui_last_step";
   const PIN_SIGNIN_KEY = "sairyne_ui_pin_signin";
+  const BUILD_KEY = "sairyne_web_build";
+  const BUILD_TAG = "b6b4b09-screenmanager-thrash-fix";
 
   // JUCE-side persistence currently rejects empty values (see Sairyne.log).
   // Use a non-empty tombstone for "clearing" persisted keys.
@@ -280,6 +284,11 @@ export default function ScreenManager() {
   };
 
   useEffect(() => {
+    // Debug marker to confirm the plugin loaded the latest Vercel build (shows up in Sairyne.log).
+    try {
+      if (isEmbedded) safeSetItem(BUILD_KEY, BUILD_TAG);
+    } catch {}
+
     // Try immediately (may still be before JUCE inject), then retry when data arrives.
     tryAutoBootstrap();
 
@@ -290,17 +299,19 @@ export default function ScreenManager() {
       window.addEventListener("sairyne-data-loaded", onDataLoaded as any);
     }
 
-    // Small retry window to handle AU timing / slow init without needing user interaction.
-    const t = window.setInterval(() => tryAutoBootstrap(), 600);
-    const stop = window.setTimeout(() => window.clearInterval(t), 6000);
+    // Small retry window to handle AU timing / slow init.
+    // IMPORTANT: In embedded JUCE hosts, polling can cause step thrash while keys are still injecting,
+    // which in turn spams persistence and can lead to WebView reload/freeze. Prefer event-driven retries.
+    const t = isEmbedded ? null : window.setInterval(() => tryAutoBootstrap(), 600);
+    const stop = isEmbedded ? null : window.setTimeout(() => window.clearInterval(t as any), 6000);
 
     return () => {
       if (typeof window !== "undefined") {
         window.removeEventListener("sairyne-init-loaded", onDataLoaded as any);
         window.removeEventListener("sairyne-data-loaded", onDataLoaded as any);
       }
-      window.clearInterval(t);
-      window.clearTimeout(stop);
+      if (t) window.clearInterval(t as any);
+      if (stop) window.clearTimeout(stop as any);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
