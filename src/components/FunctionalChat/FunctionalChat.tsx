@@ -337,6 +337,24 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     }, waitMs);
   }, [hasPersistedMessagesForSession]);
 
+  // In embedded plugin: new project sessions should start in Learn mode by default.
+  // If this project session has no persisted messages, reset mode to 'learn' (even if last session was 'pro').
+  useEffect(() => {
+    if (!isEmbedded) return;
+    const sessionKey = resolveActiveSessionKey();
+    if (!sessionKey) return;
+    const hasPersisted = hasPersistedMessagesForSession(sessionKey);
+    if (hasPersisted === false) {
+      if (previousModeRef.current !== 'learn') {
+        previousModeRef.current = 'learn';
+        setSelectedLearnLevel('learn');
+        try {
+          safeSetItem(MODE_KEY, 'learn');
+        } catch {}
+      }
+    }
+  }, [isEmbedded, hasPersistedMessagesForSession]);
+
   const resetUiToBlankSession = useCallback(() => {
     // Reset in-memory UI state so switching projects doesn't reuse previous project's chat
     const emptyModeStates: Record<string, ModeState> = {
