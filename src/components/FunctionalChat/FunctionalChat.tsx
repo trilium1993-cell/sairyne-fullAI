@@ -867,6 +867,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   }, [persistChatStateNow]);
 
   useEffect(() => {
+    // In embedded JUCE hosts, autosaving large chat state on every small UI change can freeze/reload the WebView.
+    // We persist explicitly at stable points (after send/after response) + on pagehide/beforeunload via scroll hook flush.
+    if (isEmbedded) return;
     const t = window.setTimeout(() => {
       try {
         persistChatStateNow();
@@ -1100,6 +1103,30 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     scrollToNewMessage();
   };
 
+  const addAIMessageInstant = useCallback((content: string) => {
+    const message: Message = {
+      id: `ai-${Date.now()}`,
+      type: 'ai',
+      content,
+      timestamp: Date.now(),
+      isTyping: false,
+      isThinking: false,
+    };
+    setMessages((prev) => [...prev, message]);
+    scrollToNewMessage();
+  }, []);
+
+  const persistSoon = useCallback(() => {
+    try {
+      // Best-effort: allow React state to settle first.
+      window.setTimeout(() => {
+        try {
+          persistChatStateNowRef.current?.();
+        } catch {}
+      }, 150);
+    } catch {}
+  }, []);
+
 
   // Обработка отправки сообщения
   const handleSendMessage = async () => {
@@ -1154,7 +1181,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         console.log('[FunctionalChat] Pro Mode: Offline, showing offline message');
         // Добавляем сообщение пользователя даже в оффлайн режиме
         addUserMessage(messageText);
-        addAIMessage("You're currently offline. Please reconnect to the server to continue the AI conversation.");
+        if (isEmbedded) {
+          addAIMessageInstant("You're currently offline. Please reconnect to the server to continue the AI conversation.");
+          persistSoon();
+        } else {
+          addAIMessage("You're currently offline. Please reconnect to the server to continue the AI conversation.");
+        }
         return;
       }
       
@@ -1244,6 +1276,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           }
         } catch {}
 
+        // In embedded hosts, persist once after staging the request (avoid autosave storms).
+        if (isEmbedded) {
+          try {
+            persistSoon();
+          } catch {}
+        }
+
         // Отправляем запрос асинхронно
         ChatService.sendMessage(messageText, conversationHistory, aiMode)
           .then(aiResponse => {
@@ -1257,27 +1296,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               return filtered;
             });
 
-            // Store the received response inside pendingAi until rendering completes.
-            try {
-              const sessionKey = resolveActiveSessionKey();
-              if (sessionKey) {
-                const existing = safeGetItem(CHAT_STATE_KEY);
-                if (existing) {
-                  const root = safeJsonParse<any>(existing, {}) || {};
-                  const pending = root?.sessions?.[sessionKey]?.pendingAi;
-                  if (pending && typeof pending === 'object') {
-                    pending.responseText = aiResponse;
-                    pending.receivedAt = Date.now();
-                    pending.status = 'response';
-                    root.sessions[sessionKey].pendingAi = pending;
-                    safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
-                  }
-                }
-              }
-            } catch {}
-
-            // Add AI response with typing animation; clear pendingAi only after typing completes.
-            addAIMessage(aiResponse, () => {
+            // Embedded hosts: render instantly (no typing animation) and clear pendingAi immediately.
+            if (isEmbedded) {
+              addAIMessageInstant(aiResponse);
+              // Clear pendingAi quickly so reopening doesn't try to "resume" this response again.
               try {
                 const sessionKey = resolveActiveSessionKey();
                 if (sessionKey) {
@@ -1291,7 +1313,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   }
                 }
               } catch {}
-            });
+              persistSoon();
+            } else {
+              // Web: keep typing animation.
+              addAIMessage(aiResponse, () => {
+                try {
+                  const sessionKey = resolveActiveSessionKey();
+                  if (sessionKey) {
+                    const existing = safeGetItem(CHAT_STATE_KEY);
+                    if (existing) {
+                      const root = safeJsonParse<any>(existing, {}) || {};
+                      if (root?.sessions?.[sessionKey]) {
+                        delete root.sessions[sessionKey].pendingAi;
+                        safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+                      }
+                    }
+                  }
+                } catch {}
+              });
+            }
             AnalyticsService.track('AIMessageSent', {
               mode: 'pro',
               characters: aiResponse?.length || 0,
