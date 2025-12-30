@@ -955,6 +955,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     persistChatStateNowRef.current = persistChatStateNow;
   }, [persistChatStateNow]);
 
+  // Best-effort flush when component unmounts (e.g., plugin window closed while host stays open).
+  useEffect(() => {
+    return () => {
+      try {
+        persistChatStateNowRef.current?.();
+      } catch {}
+    };
+  }, []);
+
   useEffect(() => {
     // In embedded JUCE hosts, autosaving large chat state on every small UI change can freeze/reload the WebView.
     // We persist explicitly at stable points (after send/after response) + on pagehide/beforeunload via scroll hook flush.
