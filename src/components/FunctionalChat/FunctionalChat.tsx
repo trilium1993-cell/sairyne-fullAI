@@ -660,10 +660,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
   }, []); // Только при монтировании
 
-  // Restore last selected chat mode in embedded plugin (Pro/Create/Learn).
-  // This avoids falling back to "learn" after a WebView reload.
+  // Restore last selected chat mode:
+  // - In browser: use global key.
+  // - In embedded: use global key ONLY when there is no active project session yet
+  //   (e.g., before user selects/creates a project). Once a project is selected,
+  //   per-session mode is handled by the session effect below.
   useEffect(() => {
-    if (!isEmbedded) return;
     const apply = (raw: string | null) => {
       const v = String(raw || '').trim();
       if (v === 'learn' || v === 'create' || v === 'pro') {
@@ -671,6 +673,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         setSelectedLearnLevel(v);
       }
     };
+    const sessionKey = isEmbedded ? resolveActiveSessionKey() : null;
+    // Skip global restore when embedded and a project session exists.
+    if (isEmbedded && sessionKey) return;
     try {
       apply(safeGetItem(MODE_KEY));
     } catch {}
@@ -685,7 +690,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     } catch {
       return;
     }
-  }, [isEmbedded]);
+  }, [isEmbedded, resolveActiveSessionKey]);
 
   // Scroll to show new AI message once, then let user scroll manually (like ChatGPT)
   const scrollToNewMessage = () => {
