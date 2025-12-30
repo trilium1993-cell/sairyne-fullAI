@@ -16,6 +16,21 @@ const lastSentToJuceValue: Map<string, string> = new Map();
 const pendingJuceSaveTimer: Map<string, number> = new Map();
 const pendingJuceSaveValue: Map<string, string> = new Map();
 
+// Optional SQLite bridge (native) to offload large payloads from JUCE PropertiesFile.
+// Uses separate tracking to avoid mixing timers/caches with JUCE path.
+type SqliteBridge = {
+  load: (key: string) => Promise<string | null>;
+  save: (key: string, value: string) => Promise<void>;
+  bulkLoad?: (keys: string[]) => Promise<Record<string, string | null>>;
+  delete?: (key: string) => Promise<void>;
+};
+const SQLITE_CHAT_KEYS = new Set<string>(['sairyne_functional_chat_state_v1']);
+const lastSentToSqliteAt: Map<string, number> = new Map();
+const lastSentToSqliteValue: Map<string, string> = new Map();
+const pendingSqliteSaveTimer: Map<string, number> = new Map();
+const pendingSqliteSaveValue: Map<string, string> = new Map();
+const pendingSqliteLoads: Set<string> = new Set();
+
 // Keys that can be very large and/or updated frequently.
 // NOTE: chat-state is handled with special logic in embedded mode (compressed + short debounce),
 // so we don't include it here.
@@ -83,6 +98,18 @@ const NO_DISPATCH_KEYS = new Set<string>([
   'sairyne_ui_last_step',
   'sairyne_web_build',
 ]);
+
+function getSqliteBridge(): SqliteBridge | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const bridge = (window as any)?.sairyneNative?.sqlite;
+    if (!bridge) return null;
+    if (typeof bridge.load !== 'function' || typeof bridge.save !== 'function') return null;
+    return bridge as SqliteBridge;
+  } catch {
+    return null;
+  }
+}
 
 // Track pending load requests to prevent infinite loops
 const pendingLoads: Set<string> = new Set();
@@ -244,6 +271,40 @@ export function safeGetItem(key: string): string | null {
     }
   }
 
+  // Try SQLite backend for large chat state (async load; mirrors JUCE async pattern).
+  if (SQLITE_CHAT_KEYS.has(key)) {
+    const sqlite = getSqliteBridge();
+    if (sqlite && !pendingSqliteLoads.has(key)) {
+      pendingSqliteLoads.add(key);
+      sqlite
+        .load(key)
+        .then((value) => {
+          if (value == null) return;
+          let normalized = value;
+          if (key === 'sairyne_functional_chat_state_v1' && value && value.startsWith('lz:')) {
+            try {
+              const decoded = decompressFromBase64(value.slice(3));
+              if (decoded) normalized = decoded;
+            } catch {}
+          }
+          memoryStorage.set(key, normalized);
+          if (IS_DEV) console.log('[Storage] ✅ Retrieved from SQLite:', key, `value length: ${normalized.length}`);
+          // Dispatch to trigger hydration listeners (even for chat state).
+          if (typeof window !== 'undefined') {
+            try {
+              window.dispatchEvent(new CustomEvent('sairyne-data-loaded', { detail: { key, value: normalized } }));
+            } catch {}
+          }
+        })
+        .catch((e) => {
+          console.warn('[Storage] SQLite load failed:', e);
+        })
+        .finally(() => {
+          pendingSqliteLoads.delete(key);
+        });
+    }
+  }
+
   // Request from JUCE (async, will come via onJuceDataLoaded)
   // But prevent infinite loops - only request if not already pending
   if (!pendingLoads.has(key)) {
@@ -287,115 +348,159 @@ export function safeSetItem(key: string, value: string): boolean {
 
   // ALWAYS save to JUCE (this is the source of truth), but guard against storms.
   try {
-    // Deduplicate identical values: skip JUCE write + skip emitting events.
-    if (isSame) {
-      return true;
-    }
-
-    // Embedded plugin stability: store chat state compressed before persisting to JUCE.
-    // This keeps payload small and avoids WKWebView reloads on large writes.
-    let juceValue = value;
     const isChatState = key === 'sairyne_functional_chat_state_v1';
     const isEmbedded = isEmbeddedRuntime();
-    if (isChatState && isEmbedded) {
-      try {
-        juceValue = `lz:${compressToBase64(value)}`;
-      } catch {
-        juceValue = value;
+
+    // If SQLite bridge is available for chat state, prefer it over JUCE to avoid bridge overload.
+    const sqlite = SQLITE_CHAT_KEYS.has(key) ? getSqliteBridge() : null;
+    const skipJuce = Boolean(sqlite && isChatState);
+    if (sqlite && isChatState) {
+      let sqliteValue = value;
+      if (isEmbedded) {
+        try {
+          sqliteValue = `lz:${compressToBase64(value)}`;
+        } catch {
+          sqliteValue = value;
+        }
+      }
+      const now = Date.now();
+      const lastVal = lastSentToSqliteValue.get(key);
+      const lastAt = lastSentToSqliteAt.get(key) ?? 0;
+      if (!(typeof lastVal === 'string' && lastVal === sqliteValue && now - lastAt < 15000)) {
+        pendingSqliteSaveValue.set(key, sqliteValue);
+        const existingTimer = pendingSqliteSaveTimer.get(key);
+        if (existingTimer) {
+          try {
+            window.clearTimeout(existingTimer);
+          } catch {}
+        }
+        const t = window.setTimeout(() => {
+          try {
+            const latest = pendingSqliteSaveValue.get(key);
+            if (typeof latest !== 'string') return;
+            sqlite.save(key, latest);
+            lastSentToSqliteAt.set(key, Date.now());
+            lastSentToSqliteValue.set(key, latest);
+          } catch (e) {
+            console.error('[Storage] ❌ SQLite save failed:', e);
+          } finally {
+            pendingSqliteSaveTimer.delete(key);
+            pendingSqliteSaveValue.delete(key);
+          }
+        }, 500);
+        pendingSqliteSaveTimer.set(key, t);
       }
     }
 
-    // Chat state must be saved reliably even if the host closes the UI without firing pagehide/visibilitychange.
-    // Use a very short debounce in embedded mode (so we don't spam), but we still persist within ~500ms.
-    if (isChatState && isEmbedded) {
+    if (!skipJuce) {
+      // Deduplicate identical values: skip JUCE write + skip emitting events.
+      if (isSame) {
+        return true;
+      }
+
+      // Embedded plugin stability: store chat state compressed before persisting to JUCE.
+      // This keeps payload small and avoids WKWebView reloads on large writes.
+      let juceValue = value;
+      if (isChatState && isEmbedded) {
+        try {
+          juceValue = `lz:${compressToBase64(value)}`;
+        } catch {
+          juceValue = value;
+        }
+      }
+
+      // Chat state must be saved reliably even if the host closes the UI without firing pagehide/visibilitychange.
+      // Use a very short debounce in embedded mode (so we don't spam), but we still persist within ~500ms.
+      if (isChatState && isEmbedded) {
+        const now = Date.now();
+        const lastAt = lastSentToJuceAt.get(key) ?? 0;
+        const lastVal = lastSentToJuceValue.get(key);
+        if (typeof lastVal === 'string' && lastVal === juceValue && now - lastAt < 15000) {
+          return true;
+        }
+
+        // Coalesce rapid updates into a single write soon.
+        pendingJuceSaveValue.set(key, juceValue);
+        const existingTimer = pendingJuceSaveTimer.get(key);
+        if (existingTimer) {
+          try {
+            window.clearTimeout(existingTimer);
+          } catch {}
+        }
+        const t = window.setTimeout(() => {
+          try {
+            const latest = pendingJuceSaveValue.get(key);
+            if (typeof latest !== 'string') return;
+            if (typeof (window as any)?.saveToJuce === 'function') {
+              (window as any).saveToJuce(key, latest);
+              lastSentToJuceAt.set(key, Date.now());
+              lastSentToJuceValue.set(key, latest);
+            }
+          } catch (e) {
+            console.error('[Storage] ❌ Debounced chat-state JUCE save failed:', e);
+          } finally {
+            pendingJuceSaveTimer.delete(key);
+            pendingJuceSaveValue.delete(key);
+          }
+        }, 500);
+        pendingJuceSaveTimer.set(key, t);
+        return true;
+      }
+
+      // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
       const now = Date.now();
       const lastAt = lastSentToJuceAt.get(key) ?? 0;
+      if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
+        pendingJuceSaveValue.set(key, juceValue);
+        const existingTimer = pendingJuceSaveTimer.get(key);
+        if (existingTimer) {
+          try {
+            window.clearTimeout(existingTimer);
+          } catch {}
+        }
+        const t = window.setTimeout(() => {
+          flushPendingJuceSaves();
+        }, 15000);
+        pendingJuceSaveTimer.set(key, t);
+        return true;
+      }
+
+      // Non-embedded: cheap throttle is fine.
+      if (THROTTLED_JUCE_KEYS.has(key) && now - lastAt < 3500) {
+        return true;
+      }
+
+      // If we already sent the same value very recently, skip.
       const lastVal = lastSentToJuceValue.get(key);
       if (typeof lastVal === 'string' && lastVal === juceValue && now - lastAt < 15000) {
         return true;
       }
 
-      // Coalesce rapid updates into a single write soon.
-      pendingJuceSaveValue.set(key, juceValue);
-      const existingTimer = pendingJuceSaveTimer.get(key);
-      if (existingTimer) {
-        try {
-          window.clearTimeout(existingTimer);
-        } catch {}
+      if (IS_DEV) {
+        console.log('[Storage] 🔄 Saving to JUCE PropertiesFile:', key, `value length: ${value.length}`);
+        console.log('[Storage] 📦 Value preview (first 100 chars):', value.substring(0, 100));
+        console.log('[Storage] 🔍 Checking window.saveToJuce...');
+        console.log('[Storage] 🔍 window exists?', typeof window !== 'undefined');
+        console.log('[Storage] 🔍 window.saveToJuce exists?', typeof (window as any)?.saveToJuce !== 'undefined');
+        console.log('[Storage] 🔍 window.saveToJuce type:', typeof (window as any)?.saveToJuce);
       }
-      const t = window.setTimeout(() => {
-        try {
-          const latest = pendingJuceSaveValue.get(key);
-          if (typeof latest !== 'string') return;
-          if (typeof (window as any)?.saveToJuce === 'function') {
-            (window as any).saveToJuce(key, latest);
-            lastSentToJuceAt.set(key, Date.now());
-            lastSentToJuceValue.set(key, latest);
-          }
-        } catch (e) {
-          console.error('[Storage] ❌ Debounced chat-state JUCE save failed:', e);
-        } finally {
-          pendingJuceSaveTimer.delete(key);
-          pendingJuceSaveValue.delete(key);
+      
+      if (typeof window !== 'undefined' && (window as any).saveToJuce) {
+        if (IS_DEV) {
+          console.log('[Storage] ✅ window.saveToJuce is available, calling it NOW...');
+          console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
         }
-      }, 500);
-      pendingJuceSaveTimer.set(key, t);
-      return true;
-    }
-
-    // Throttle expensive keys to avoid freezing embedded WKWebView/JUCE bridge.
-    const now = Date.now();
-    const lastAt = lastSentToJuceAt.get(key) ?? 0;
-    if (THROTTLED_JUCE_KEYS.has(key) && isEmbeddedRuntime()) {
-      pendingJuceSaveValue.set(key, juceValue);
-      const existingTimer = pendingJuceSaveTimer.get(key);
-      if (existingTimer) {
-        try {
-          window.clearTimeout(existingTimer);
-        } catch {}
-      }
-      const t = window.setTimeout(() => {
-        flushPendingJuceSaves();
-      }, 15000);
-      pendingJuceSaveTimer.set(key, t);
-      return true;
-    }
-
-    // Non-embedded: cheap throttle is fine.
-    if (THROTTLED_JUCE_KEYS.has(key) && now - lastAt < 3500) {
-      return true;
-    }
-
-    // If we already sent the same value very recently, skip.
-    const lastVal = lastSentToJuceValue.get(key);
-    if (typeof lastVal === 'string' && lastVal === juceValue && now - lastAt < 15000) {
-      return true;
-    }
-
-    if (IS_DEV) {
-      console.log('[Storage] 🔄 Saving to JUCE PropertiesFile:', key, `value length: ${value.length}`);
-      console.log('[Storage] 📦 Value preview (first 100 chars):', value.substring(0, 100));
-      console.log('[Storage] 🔍 Checking window.saveToJuce...');
-      console.log('[Storage] 🔍 window exists?', typeof window !== 'undefined');
-      console.log('[Storage] 🔍 window.saveToJuce exists?', typeof (window as any)?.saveToJuce !== 'undefined');
-      console.log('[Storage] 🔍 window.saveToJuce type:', typeof (window as any)?.saveToJuce);
-    }
-    
-    if (typeof window !== 'undefined' && (window as any).saveToJuce) {
-      if (IS_DEV) {
-        console.log('[Storage] ✅ window.saveToJuce is available, calling it NOW...');
-        console.log('[Storage] 📞 Calling saveToJuce with key:', key, 'value length:', value.length);
-      }
-      (window as any).saveToJuce(key, juceValue);
-      lastSentToJuceAt.set(key, now);
-      lastSentToJuceValue.set(key, juceValue);
-      if (IS_DEV) console.log('[Storage] ✅ saveToJuce called for:', key);
-    } else {
-      if (IS_DEV) {
-        console.error('[Storage] ❌ window.saveToJuce NOT AVAILABLE!');
-        console.error('[Storage] ❌ window object:', typeof window);
-        console.error('[Storage] ❌ window.saveToJuce type:', typeof (window as any)?.saveToJuce);
-        console.error('[Storage] ❌ This means juceBridge.ts was not loaded or onJuceInit was not called!');
+        (window as any).saveToJuce(key, juceValue);
+        lastSentToJuceAt.set(key, now);
+        lastSentToJuceValue.set(key, juceValue);
+        if (IS_DEV) console.log('[Storage] ✅ saveToJuce called for:', key);
+      } else {
+        if (IS_DEV) {
+          console.error('[Storage] ❌ window.saveToJuce NOT AVAILABLE!');
+          console.error('[Storage] ❌ window object:', typeof window);
+          console.error('[Storage] ❌ window.saveToJuce type:', typeof (window as any)?.saveToJuce);
+          console.error('[Storage] ❌ This means juceBridge.ts was not loaded or onJuceInit was not called!');
+        }
       }
     }
   } catch (error) {
@@ -442,6 +547,16 @@ export function safeRemoveItem(key: string): boolean {
   }
 
   try {
+    // Also clear SQLite if used for chat state.
+    if (SQLITE_CHAT_KEYS.has(key)) {
+      const sqlite = getSqliteBridge();
+      if (sqlite?.delete) {
+        try {
+          sqlite.delete(key);
+        } catch {}
+      }
+    }
+
     if (isLocalStorageAvailable()) {
       window.localStorage.removeItem(key);
     }
