@@ -504,16 +504,43 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       if (!parsed || typeof parsed !== 'object') return false;
       // v2+: per-project sessions
       const sessionKey = resolveActiveSessionKey();
+      let resolvedSessionKey = sessionKey;
       try {
         const keys = parsed?.sessions ? Object.keys(parsed.sessions) : [];
-        const line = `HYDRATE_SESSION | sessionKey=${sessionKey || 'null'} | sessions=${keys.join(',')}`;
+        const line = `HYDRATE_SESSION | sessionKey=${resolvedSessionKey || sessionKey || 'null'} | sessions=${keys.join(',')}`;
         console.log('[FunctionalChat]', line);
         try {
           (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
         } catch {}
       } catch {}
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
-      const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
+      let session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
+
+      // Fallback: if current project session is missing, reuse the most recent session we have.
+      if (hasSessions && sessionKey && !session) {
+        try {
+          const keys = Object.keys(parsed.sessions || {});
+          // Pick the latest by numeric suffix (project id) to stay deterministic.
+          const fallbackKey = keys
+            .map((k) => {
+              const parts = k.split(':');
+              const num = Number(parts[parts.length - 1]) || 0;
+              return { k, num };
+            })
+            .sort((a, b) => a.num - b.num)
+            .slice(-1)[0]?.k;
+          if (fallbackKey) {
+            session = parsed.sessions[fallbackKey];
+            resolvedSessionKey = fallbackKey;
+            lastSessionKeyRef.current = fallbackKey;
+            const line = `HYDRATE_FALLBACK | missing session for ${sessionKey}, using ${fallbackKey}`;
+            console.log('[FunctionalChat]', line);
+            try {
+              (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+            } catch {}
+          }
+        } catch {}
+      }
 
       try {
         const effectiveForLog = session && typeof session === 'object' ? session : parsed;
@@ -537,12 +564,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // If we have per-project sessions but no project selected yet, do not hydrate anything.
       // This avoids accidentally showing the last opened project's chat for every project.
-      if (hasSessions && !sessionKey) {
+      if (hasSessions && !resolvedSessionKey) {
         return false;
       }
 
       // v2 behavior: if we have sessions but none for this project, do NOT fall back to another project's state
-      if (hasSessions && sessionKey && !session) {
+      if (hasSessions && resolvedSessionKey && !session) {
         return false;
       }
 
@@ -640,7 +667,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
           try {
-            lastSessionKeyRef.current = sessionKey || lastSessionKeyRef.current;
+            lastSessionKeyRef.current = resolvedSessionKey || sessionKey || lastSessionKeyRef.current;
             setIsProjectSessionReady(true);
             setIsHydrationGateReady(true);
           } catch {}
