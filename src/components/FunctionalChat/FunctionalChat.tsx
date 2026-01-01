@@ -771,7 +771,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isThinking
     };
 
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => {
+      const next = [...prev, message];
+      const mode = selectedLearnLevel || previousModeRef.current || 'learn';
+      const existing = modeStatesRef.current[mode] || {
+        messages: [],
+        currentStep: 0,
+        scrollPosition: 0,
+        showOptions: false,
+        showGenres: false,
+        showReadyButton: false,
+        showCompletedStep: false,
+        completedStepText: '',
+      };
+      modeStatesRef.current[mode] = {
+        ...existing,
+        messages: trimMessages(next),
+      };
+      return next;
+    });
     // Scroll to the new message once when it appears
     scrollToNewMessage();
 
@@ -1255,7 +1273,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, message]);
+    setMessages(prev => {
+      const next = [...prev, message];
+      const mode = selectedLearnLevel || previousModeRef.current || 'learn';
+      const existing = modeStatesRef.current[mode] || {
+        messages: [],
+        currentStep: 0,
+        scrollPosition: 0,
+        showOptions: false,
+        showGenres: false,
+        showReadyButton: false,
+        showCompletedStep: false,
+        completedStepText: '',
+      };
+      modeStatesRef.current[mode] = {
+        ...existing,
+        messages: trimMessages(next),
+      };
+      return next;
+    });
     // Scroll to the new message once when it appears
     scrollToNewMessage();
   };
@@ -1272,25 +1308,21 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       };
       setMessages((prev) => {
         const next = [...prev, message];
-        // For embedded: immediately mirror into modeStatesRef to avoid losing the last AI message
-        // when persist is forced before React effects run.
-        if (isEmbedded) {
-          const activeMode = previousModeRef.current || selectedLearnLevel || 'learn';
-          const existing = modeStatesRef.current[activeMode] || {
-            messages: [],
-            currentStep: 0,
-            scrollPosition: 0,
-            showOptions: false,
-            showGenres: false,
-            showReadyButton: false,
-            showCompletedStep: false,
-            completedStepText: '',
-          };
-          modeStatesRef.current[activeMode] = {
-            ...existing,
-            messages: trimMessages(next),
-          };
-        }
+        const mode = selectedLearnLevel || previousModeRef.current || 'learn';
+        const existing = modeStatesRef.current[mode] || {
+          messages: [],
+          currentStep: 0,
+          scrollPosition: 0,
+          showOptions: false,
+          showGenres: false,
+          showReadyButton: false,
+          showCompletedStep: false,
+          completedStepText: '',
+        };
+        modeStatesRef.current[mode] = {
+          ...existing,
+          messages: trimMessages(next),
+        };
         return next;
       });
       // Force a persist right away in embed to capture the last AI message.
