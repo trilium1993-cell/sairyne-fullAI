@@ -684,6 +684,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
+
+        // After restoring messages, immediately persist to capture this snapshot (including last message).
+        try {
+          persistChatStateNowRef.current?.({ force: true });
+        } catch {}
       }
 
       try {
@@ -1075,9 +1080,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       showCompletedStep,
       completedStepText,
     };
+    const liveMessages = messagesRef.current && messagesRef.current.length >= messages.length ? messagesRef.current : messages;
     modeStatesRef.current[activeMode] = {
       ...existingActive,
-      messages: trimMessages(messages),
+      messages: trimMessages(liveMessages),
       currentStep,
       scrollPosition: typeof latestScroll === 'number' ? latestScroll : existingActive.scrollPosition || 0,
       showOptions,
