@@ -662,6 +662,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
       }
 
+      try {
+        setIsProjectSessionReady(true);
+        setIsHydrationGateReady(true);
+      } catch {}
+
       return true;
     } catch (e) {
       console.warn('[FunctionalChat] Failed to hydrate chat state:', e);
