@@ -614,6 +614,21 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         };
       }
 
+      // Heuristic: if Pro has messages but current mode is empty/minimal, switch to Pro to show the chat.
+      try {
+        const proCount = modeStatesRef.current.pro?.messages?.length || 0;
+        const learnCount = modeStatesRef.current.learn?.messages?.length || 0;
+        const createCount = modeStatesRef.current.create?.messages?.length || 0;
+        if (
+          proCount > 0 &&
+          selectedLearnLevel !== 'pro' &&
+          ((selectedLearnLevel === 'learn' && learnCount <= 1) || (selectedLearnLevel === 'create' && createCount === 0))
+        ) {
+          previousModeRef.current = 'pro';
+          setSelectedLearnLevel('pro');
+        }
+      } catch {}
+
       // Apply current mode state to UI
       const active = previousModeRef.current || 'learn';
       const savedState = modeStatesRef.current[active];
