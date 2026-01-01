@@ -357,7 +357,19 @@ export function safeGetItem(key: string): string | null {
  * Safe localStorage.setItem with error handling
  * Always saves to JUCE, localStorage is only a UI cache
  */
+function isInvalidAccessTokenWrite(key: string, value: string | null | undefined) {
+  if (key !== 'sairyne_access_token') return false;
+  if (value === null || value === undefined) return true;
+  const v = String(value).trim();
+  if (v === '' || v === '0') return true;
+  return false;
+}
+
 export function safeSetItem(key: string, value: string): boolean {
+  if (isInvalidAccessTokenWrite(key, value)) {
+    if (IS_DEV) console.warn('[Storage] ⏭️ Skip invalid access_token write:', value);
+    return true;
+  }
   // Ignore bogus selected_project payloads that reset to "0" (breaks per-session keys).
   if (key === 'sairyne_selected_project') {
     const trimmed = (value || '').trim();

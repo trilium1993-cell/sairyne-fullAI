@@ -576,7 +576,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // Restore mode states
       if (effective.modeStates && typeof effective.modeStates === 'object') {
-        const restored: any = {};
+      const restored: any = {};
         ['learn', 'create', 'pro'].forEach((mode) => {
           const st = effective.modeStates[mode];
           if (st && typeof st === 'object') {
@@ -675,9 +675,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
         // After restoring messages, immediately persist to capture this snapshot (including last message).
         if (savedState.messages && savedState.messages.length > 0) {
-          try {
-            persistChatStateNowRef.current?.({ force: true });
-          } catch {}
+          setTimeout(() => {
+            try {
+              persistChatStateNowRef.current?.({ force: true });
+            } catch {}
+          }, 0);
         }
       }
 
@@ -702,9 +704,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             setCompletedStepText(st.completedStepText || '');
             isInitializedRef.current = true;
             scheduleReliableScrollRestore(st.scrollPosition ?? 0);
-            try {
-              persistChatStateNowRef.current?.({ force: true });
-            } catch {}
+            setTimeout(() => {
+              try {
+                persistChatStateNowRef.current?.({ force: true });
+              } catch {}
+            }, 0);
           }
         }
       } catch {}
