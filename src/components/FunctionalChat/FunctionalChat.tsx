@@ -303,10 +303,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       if (!session || typeof session !== 'object') return false;
       const modeStates = session.modeStates;
       if (!modeStates || typeof modeStates !== 'object') return false;
+      const countNonEmpty = (arr: any) =>
+        Array.isArray(arr) ? arr.filter((m: any) => typeof m?.content === 'string' && m.content.trim().length > 0).length : 0;
       const any =
-        (Array.isArray(modeStates.learn?.messages) && modeStates.learn.messages.length > 0) ||
-        (Array.isArray(modeStates.create?.messages) && modeStates.create.messages.length > 0) ||
-        (Array.isArray(modeStates.pro?.messages) && modeStates.pro.messages.length > 0);
+        countNonEmpty(modeStates.learn?.messages) > 0 ||
+        countNonEmpty(modeStates.create?.messages) > 0 ||
+        countNonEmpty(modeStates.pro?.messages) > 0;
       return any;
     } catch {
       return null;
@@ -422,11 +424,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   }, []);
 
   const sanitizeMessages = (msgs: Message[]): Message[] =>
-    msgs.map((m) => ({
-      ...m,
-      isVisible: true,
-      isTyping: false,
-    }));
+    msgs
+      .filter((m) => typeof m?.content === 'string' && m.content.trim().length > 0)
+      .map((m) => ({
+        ...m,
+        isVisible: true,
+        isTyping: false,
+      }));
 
   const trimMessages = (msgs: Message[]): Message[] => {
     if (!Array.isArray(msgs)) return [];
