@@ -227,7 +227,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const analysisTimeoutRef = useRef<number | null>(null);
   // Persist scroll position even when user only scrolls (no new messages).
   const scrollDebounceTimerRef = useRef<number | null>(null);
-  const persistChatStateNowRef = useRef<(() => void) | null>(null);
+  const persistChatStateNowRef = useRef<((opts?: { force?: boolean }) => void) | null>(null);
   // Restore scroll reliably: WKWebView/React can clamp scrollTop to 0 if we set it before layout is ready.
   const pendingInitialScrollRef = useRef<number | null>(null);
   const scrollRestoreTimerRef = useRef<number | null>(null);
@@ -923,20 +923,27 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   }, [isProjectSessionReady, resumeLastRequest]);
 
   // Persist chat state (debounced) so AU/VST3 window reload doesn't wipe it
-  const persistChatStateNow = useCallback(() => {
+  const persistChatStateNow = useCallback((opts?: { force?: boolean }) => {
+    const force = Boolean(opts?.force);
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
 
     // IMPORTANT (Plugin stability): throttling writes to the JUCE bridge.
     // In embedded hosts, frequent large writes can freeze WKWebView and cause reload loops.
-    try {
-      const now = Date.now();
-      const isHidden = typeof document !== 'undefined' ? Boolean(document.hidden) : false;
-      if (isEmbedded && !isHidden && now - lastPersistAtRef.current < 4000) {
-        return;
-      }
-      lastPersistAtRef.current = now;
-    } catch {}
+    if (!force) {
+      try {
+        const now = Date.now();
+        const isHidden = typeof document !== 'undefined' ? Boolean(document.hidden) : false;
+        if (isEmbedded && !isHidden && now - lastPersistAtRef.current < 4000) {
+          return;
+        }
+        lastPersistAtRef.current = now;
+      } catch {}
+    } else {
+      try {
+        lastPersistAtRef.current = Date.now();
+      } catch {}
+    }
 
     // Ensure active mode state includes the latest scroll position (even if user only scrolled).
     const activeMode = previousModeRef.current || selectedLearnLevel || 'learn';
@@ -993,7 +1000,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     return () => {
       try {
-        persistChatStateNowRef.current?.();
+        persistChatStateNowRef.current?.({ force: true });
       } catch {}
     };
   }, []);
@@ -1451,7 +1458,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               } catch {}
               // Persist immediately so the completed AI message is saved even if the window closes right away.
               try {
-                persistChatStateNowRef.current?.();
+                persistChatStateNowRef.current?.({ force: true });
               } catch {}
               // Also schedule a best-effort follow-up persist.
               persistSoon();
