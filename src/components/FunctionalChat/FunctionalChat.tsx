@@ -632,6 +632,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             isInitializedRef.current = true;
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
+          try {
+            lastSessionKeyRef.current = sessionKey || lastSessionKeyRef.current;
+            setIsProjectSessionReady(true);
+            setIsHydrationGateReady(true);
+          } catch {}
           return true;
         }
       } catch {}
