@@ -686,9 +686,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
 
         // After restoring messages, immediately persist to capture this snapshot (including last message).
-        try {
-          persistChatStateNowRef.current?.({ force: true });
-        } catch {}
+        if (savedState.messages && savedState.messages.length > 0) {
+          try {
+            persistChatStateNowRef.current?.({ force: true });
+          } catch {}
+        }
       }
 
       try {
