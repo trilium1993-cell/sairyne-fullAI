@@ -506,8 +506,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // Backward-compat: old format (no sessions) treated as current session (will be migrated on next save)
       const effective = session && typeof session === 'object' ? session : parsed;
-      // Drop any stale pending AI payload so UI doesn't wait for a finished response after reopen.
-      if (effective && typeof effective === 'object' && (effective as any).pendingAi) {
+      const pending = effective && typeof effective === 'object' ? (effective as any).pendingAi : null;
+      // If pendingAi has a finished response, materialize it into messages so we don't lose it on reopen.
+      let pendingResponse: { mode?: string; text?: string } | null = null;
+      if (pending && typeof pending === 'object') {
+        const text = (pending as any).responseText;
+        if (typeof text === 'string' && text.trim().length > 0) {
+          pendingResponse = { mode: (pending as any).mode as any, text };
+        }
         try {
           delete (effective as any).pendingAi;
         } catch {}
@@ -546,6 +552,30 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             pro: restored.pro ?? modeStatesRef.current.pro,
           };
         }
+      }
+
+      // If we had a pending AI response, append it to the corresponding mode messages so it renders after reopen.
+      if (pendingResponse && pendingResponse.text) {
+        const targetMode = pendingResponse.mode || previousModeRef.current || selectedLearnLevel || 'pro';
+        const existing = modeStatesRef.current[targetMode] || { messages: [] };
+        const merged = {
+          ...existing,
+          messages: [
+            ...(Array.isArray(existing.messages) ? existing.messages : []),
+            {
+              id: `ai-pending-${Date.now()}`,
+              type: 'ai',
+              content: pendingResponse.text,
+              timestamp: Date.now(),
+              isTyping: false,
+              isThinking: false,
+            } as Message,
+          ],
+        };
+        modeStatesRef.current = {
+          ...modeStatesRef.current,
+          [targetMode]: merged,
+        };
       }
 
       // Apply current mode state to UI
