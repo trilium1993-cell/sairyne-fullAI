@@ -509,6 +509,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // v2+: per-project sessions
       const sessionKey = resolveActiveSessionKey();
+      try {
+        const keys = parsed?.sessions ? Object.keys(parsed.sessions) : [];
+        const line = `HYDRATE_SESSION | sessionKey=${sessionKey || 'null'} | sessions=${keys.join(',')}`;
+        console.log('[FunctionalChat]', line);
+        try {
+          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+        } catch {}
+      } catch {}
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
       const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
@@ -964,6 +972,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const force = Boolean(opts?.force);
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+    try {
+      const line = `PERSIST_SESSION | sessionKey=${sessionKey}`;
+      console.log('[FunctionalChat]', line);
+      try {
+        (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+      } catch {}
+    } catch {}
 
     // IMPORTANT (Plugin stability): throttling writes to the JUCE bridge.
     // In embedded hosts, frequent large writes can freeze WKWebView and cause reload loops.
