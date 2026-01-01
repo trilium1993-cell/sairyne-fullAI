@@ -477,6 +477,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   const tryHydrateFromStorage = useCallback(() => {
     try {
+      try {
+        const sessionKey = resolveActiveSessionKey();
+        const msg = `[FunctionalChat] TRY_HYDRATE sessionKey=${sessionKey || 'null'}`;
+        console.log(msg);
+        try {
+          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: msg });
+        } catch {}
+      } catch {}
+
       const raw = safeGetItem(CHAT_STATE_KEY);
       if (!raw || raw === TOMBSTONE) return false;
       // Guardrail: if chat state is corrupted/too large, reset only this key.

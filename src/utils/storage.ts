@@ -218,6 +218,17 @@ export function isLocalStorageAvailable(): boolean {
  * Always requests from JUCE first, uses localStorage/memory as cache
  */
 export function safeGetItem(key: string): string | null {
+  if (key === 'sairyne_functional_chat_state_v1') {
+    try {
+      const val = memoryStorage.get(key);
+      const len = val ? val.length : 0;
+      const msg = `[Storage] SAFE_GET memory chat len=${len}`;
+      console.log(msg);
+      try {
+        (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: msg });
+      } catch {}
+    } catch {}
+  }
   // Sync from window.__sairyneStorage first (in case data was injected via onJuceInit)
   syncFromWindowStorage();
   
