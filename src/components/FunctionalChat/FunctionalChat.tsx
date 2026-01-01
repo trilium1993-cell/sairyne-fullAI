@@ -964,7 +964,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     }
 
     // Ensure active mode state includes the latest scroll position (even if user only scrolled).
-    const activeMode = previousModeRef.current || selectedLearnLevel || 'learn';
+    const activeMode = selectedLearnLevel || previousModeRef.current || 'learn';
     const existingActive = modeStatesRef.current[activeMode];
     const latestScroll = chatContainerRef.current?.scrollTop;
     if (existingActive && typeof latestScroll === 'number') {
@@ -1048,7 +1048,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
     const attachTo = (el: HTMLDivElement) => {
       const onScroll = () => {
-        const mode = previousModeRef.current || 'learn';
+        const mode = selectedLearnLevel || previousModeRef.current || 'learn';
         const st = modeStatesRef.current[mode];
         if (st) {
           modeStatesRef.current[mode] = { ...st, scrollPosition: el.scrollTop };
@@ -1152,7 +1152,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         showCompletedStep,
         completedStepText
       };
-      modeStatesRef.current[previousModeRef.current] = currentState;
+        modeStatesRef.current[selectedLearnLevel || previousModeRef.current || 'learn'] = currentState;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
