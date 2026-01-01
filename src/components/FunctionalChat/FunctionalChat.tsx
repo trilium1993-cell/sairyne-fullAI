@@ -487,6 +487,20 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
       const parsed = safeJsonParse<any>(raw, null);
       if (!parsed || typeof parsed !== 'object') return false;
+      try {
+        const modeStates = parsed?.modeStates || {};
+        const dbg = ['HYDRATE_DEBUG'];
+        ['learn', 'create', 'pro'].forEach((m) => {
+          const list = modeStates?.[m]?.messages;
+          const last = Array.isArray(list) && list.length > 0 ? list[list.length - 1] : null;
+          const preview =
+            last && typeof last.content === 'string'
+              ? last.content.slice(0, 80).replace(/\s+/g, ' ')
+              : '';
+          dbg.push(`${m}: ${Array.isArray(list) ? list.length : 0} last="${preview}"`);
+        });
+        console.log('[FunctionalChat]', dbg.join(' | '));
+      } catch {}
 
       // v2+: per-project sessions
       const sessionKey = resolveActiveSessionKey();
