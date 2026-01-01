@@ -347,6 +347,15 @@ export function safeGetItem(key: string): string | null {
  * Always saves to JUCE, localStorage is only a UI cache
  */
 export function safeSetItem(key: string, value: string): boolean {
+  // Ignore bogus selected_project payloads that reset to "0" (breaks per-session keys).
+  if (key === 'sairyne_selected_project') {
+    const trimmed = (value || '').trim();
+    if (trimmed === '0' || trimmed === '' || trimmed === '{}') {
+      if (IS_DEV) console.warn('[Storage] ⏭️ Skip persisting invalid selected_project payload:', value);
+      return true;
+    }
+  }
+
   // If value didn't change, do not spam JUCE persistence or event listeners.
   // Still refresh memory cache to keep synchronous reads consistent.
   const prev = memoryStorage.get(key);
