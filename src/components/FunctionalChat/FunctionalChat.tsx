@@ -488,7 +488,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const parsed = safeJsonParse<any>(raw, null);
       if (!parsed || typeof parsed !== 'object') return false;
       try {
-        const modeStates = parsed?.modeStates || {};
+        const effectiveForLog = session && typeof session === 'object' ? session : parsed;
+        const modeStates = effectiveForLog?.modeStates || {};
         const dbg = ['HYDRATE_DEBUG'];
         ['learn', 'create', 'pro'].forEach((m) => {
           const list = modeStates?.[m]?.messages;
