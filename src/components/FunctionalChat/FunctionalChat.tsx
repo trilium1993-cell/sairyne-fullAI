@@ -981,13 +981,30 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       } catch {}
     }
 
-    // Ensure active mode state includes the latest scroll position (even if user only scrolled).
+    // Ensure active mode state includes the latest UI state before persisting.
     const activeMode = selectedLearnLevel || previousModeRef.current || 'learn';
-    const existingActive = modeStatesRef.current[activeMode];
     const latestScroll = chatContainerRef.current?.scrollTop;
-    if (existingActive && typeof latestScroll === 'number') {
-      modeStatesRef.current[activeMode] = { ...existingActive, scrollPosition: latestScroll };
-    }
+    const existingActive = modeStatesRef.current[activeMode] || {
+      messages: [],
+      currentStep,
+      scrollPosition: 0,
+      showOptions,
+      showGenres,
+      showReadyButton,
+      showCompletedStep,
+      completedStepText,
+    };
+    modeStatesRef.current[activeMode] = {
+      ...existingActive,
+      messages: trimMessages(messages),
+      currentStep,
+      scrollPosition: typeof latestScroll === 'number' ? latestScroll : existingActive.scrollPosition || 0,
+      showOptions,
+      showGenres,
+      showReadyButton,
+      showCompletedStep,
+      completedStepText,
+    };
 
     // Cap stored messages per mode to keep PropertiesFile writes stable.
     const cappedModeStates: any = {};
