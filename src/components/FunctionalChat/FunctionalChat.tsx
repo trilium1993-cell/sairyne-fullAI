@@ -715,6 +715,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       try {
         setIsProjectSessionReady(true);
         setIsHydrationGateReady(true);
+        expectingHydrationRef.current = false;
       } catch {}
 
       return true;
@@ -735,7 +736,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (initialKey) {
       const ok = tryHydrateFromStorage();
       // If we successfully hydrated, we can open the gate immediately.
-      if (ok) setIsHydrationGateReady(true);
+      if (ok) {
+        setIsHydrationGateReady(true);
+        expectingHydrationRef.current = false;
+      }
     }
 
     // 2) If data arrives from JUCE later, re-hydrate once
@@ -763,13 +767,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }
 
         // Only hydrate when we have a project session key.
-        if (nextSessionKey) {
-          const ok = tryHydrateFromStorage();
-          if (ok) {
-            expectingHydrationRef.current = false;
-            setIsHydrationGateReady(true);
+          if (nextSessionKey) {
+            const ok = tryHydrateFromStorage();
+            if (ok) {
+              expectingHydrationRef.current = false;
+              setIsHydrationGateReady(true);
+            }
           }
-        }
           // If we are expecting hydration (persisted messages exist), keep the gate closed
           // until hydration succeeds. This prevents "first prompt" flicker.
           if (nextSessionKey && expectingHydrationRef.current) {
@@ -1164,6 +1168,20 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
     root.v = 2;
     // Do NOT persist pendingAi; it can leave the session "stuck" on reopen.
+    const existingSession = root.sessions[sessionKey];
+    if (existingSession && existingSession.modeStates) {
+      const mergedModeStates: any = { ...sessionPayload.modeStates };
+      ['learn', 'create', 'pro'].forEach((m) => {
+        const oldMsgs = existingSession.modeStates?.[m]?.messages;
+        const newMsgs = sessionPayload.modeStates?.[m]?.messages;
+        const oldCount = Array.isArray(oldMsgs) ? oldMsgs.length : 0;
+        const newCount = Array.isArray(newMsgs) ? newMsgs.length : 0;
+        if (oldCount > newCount) {
+          mergedModeStates[m] = existingSession.modeStates[m];
+        }
+      });
+      sessionPayload.modeStates = mergedModeStates;
+    }
     root.sessions[sessionKey] = sessionPayload;
     root.savedAt = Date.now();
 
