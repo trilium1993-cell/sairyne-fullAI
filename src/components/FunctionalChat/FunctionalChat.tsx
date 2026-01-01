@@ -495,11 +495,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           const last = Array.isArray(list) && list.length > 0 ? list[list.length - 1] : null;
           const preview =
             last && typeof last.content === 'string'
-              ? last.content.slice(0, 80).replace(/\s+/g, ' ')
+              ? last.content.slice(0, 120).replace(/\s+/g, ' ')
               : '';
           dbg.push(`${m}: ${Array.isArray(list) ? list.length : 0} last="${preview}"`);
         });
-        console.log('[FunctionalChat]', dbg.join(' | '));
+        const line = dbg.join(' | ');
+        console.log('[FunctionalChat]', line);
+        try {
+          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+        } catch {}
       } catch {}
 
       // v2+: per-project sessions
