@@ -1157,10 +1157,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
     // Store per-project session inside a single persisted key (so C++ inject can stay simple)
     let root: any = {};
+    let existingSession: any = null;
     try {
       const existing = safeGetItem(CHAT_STATE_KEY);
       if (existing && existing !== TOMBSTONE) {
         root = safeJsonParse<any>(existing, {});
+        existingSession = root?.sessions?.[sessionKey] || null;
       }
     } catch {}
 
@@ -1168,20 +1170,22 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
     root.v = 2;
     // Do NOT persist pendingAi; it can leave the session "stuck" on reopen.
-    const existingSession = root.sessions[sessionKey];
     if (existingSession && existingSession.modeStates) {
       const mergedModeStates: any = { ...sessionPayload.modeStates };
+      let increased = false;
       ['learn', 'create', 'pro'].forEach((m) => {
         const oldMsgs = existingSession.modeStates?.[m]?.messages;
         const newMsgs = sessionPayload.modeStates?.[m]?.messages;
         const oldCount = Array.isArray(oldMsgs) ? oldMsgs.length : 0;
         const newCount = Array.isArray(newMsgs) ? newMsgs.length : 0;
-        // Keep the larger set; if equal, prefer the newer (sessionPayload).
         if (oldCount > newCount) {
           mergedModeStates[m] = existingSession.modeStates[m];
+        } else if (newCount > oldCount) {
+          increased = true;
         }
       });
       sessionPayload.modeStates = mergedModeStates;
+      // If nothing increased and session already exists, still write merged (ids may differ), but merged keeps larger sets.
     }
     root.sessions[sessionKey] = sessionPayload;
     root.savedAt = Date.now();
