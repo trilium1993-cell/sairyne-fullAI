@@ -1449,6 +1449,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
                   }
                 }
               } catch {}
+              // Persist immediately so the completed AI message is saved even if the window closes right away.
+              try {
+                persistChatStateNowRef.current?.();
+              } catch {}
+              // Also schedule a best-effort follow-up persist.
               persistSoon();
             } else {
               // Web: keep typing animation.
