@@ -1176,6 +1176,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         const newMsgs = sessionPayload.modeStates?.[m]?.messages;
         const oldCount = Array.isArray(oldMsgs) ? oldMsgs.length : 0;
         const newCount = Array.isArray(newMsgs) ? newMsgs.length : 0;
+        // Keep the larger set; if equal, prefer the newer (sessionPayload).
         if (oldCount > newCount) {
           mergedModeStates[m] = existingSession.modeStates[m];
         }
