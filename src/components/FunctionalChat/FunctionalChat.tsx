@@ -614,12 +614,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         };
       }
 
-      // Heuristic: if Pro has messages, default to showing Pro chat (applies after hydrate).
+      // If Pro has messages, force UI to Pro and show them.
       try {
-        const proCount = modeStatesRef.current.pro?.messages?.length || 0;
-        if (proCount > 0 && selectedLearnLevel !== 'pro') {
+        const proState = modeStatesRef.current.pro;
+        const proCount = proState?.messages?.length || 0;
+        if (proCount > 0) {
           previousModeRef.current = 'pro';
           setSelectedLearnLevel('pro');
+          setMessages([...(proState.messages || [])]);
+          setCurrentStep(proState.currentStep || 0);
+          setShowOptions(!!proState.showOptions);
+          setShowGenres(!!proState.showGenres);
+          setShowReadyButton(!!proState.showReadyButton);
+          setShowCompletedStep(!!proState.showCompletedStep);
+          setCompletedStepText(proState.completedStepText || '');
+          if (proState.messages && proState.messages.length > 0) {
+            isInitializedRef.current = true;
+          }
+          scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
+          return true;
         }
       } catch {}
 
