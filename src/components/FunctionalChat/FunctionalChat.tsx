@@ -1006,6 +1006,23 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       showCompletedStep,
       completedStepText,
     };
+    try {
+      const dbg = ['PERSIST_DEBUG'];
+      ['learn', 'create', 'pro'].forEach((m) => {
+        const list = modeStatesRef.current[m]?.messages;
+        const last = Array.isArray(list) && list.length > 0 ? list[list.length - 1] : null;
+        const preview =
+          last && typeof last.content === 'string'
+            ? last.content.slice(0, 80).replace(/\s+/g, ' ')
+            : '';
+        dbg.push(`${m}: ${Array.isArray(list) ? list.length : 0} last="${preview}"`);
+      });
+      const line = dbg.join(' | ');
+      console.log('[FunctionalChat]', line);
+      try {
+        (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+      } catch {}
+    } catch {}
 
     // Cap stored messages per mode to keep PropertiesFile writes stable.
     const cappedModeStates: any = {};
