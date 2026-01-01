@@ -683,33 +683,32 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }
       }
 
-      // If still no messages in UI but some mode has messages, pick the mode with most messages and apply it.
+      // If active mode has fewer messages than another mode, switch to the mode with the most messages.
       try {
-        if (messagesRef.current.length === 0) {
-          const modes = ['pro', 'create', 'learn'] as const;
-          const best = modes
-            .map((m) => ({ m, count: modeStatesRef.current[m]?.messages?.length || 0 }))
-            .sort((a, b) => b.count - a.count)[0];
-          if (best && best.count > 0) {
-            const st = modeStatesRef.current[best.m];
-            previousModeRef.current = best.m;
-            forcedProHydrateRef.current = forcedProHydrateRef.current || best.m === 'pro';
-            setSelectedLearnLevel(best.m);
-            setMessages([...(st.messages || [])]);
-            setCurrentStep(st.currentStep || 0);
-            setShowOptions(!!st.showOptions);
-            setShowGenres(!!st.showGenres);
-            setShowReadyButton(!!st.showReadyButton);
-            setShowCompletedStep(!!st.showCompletedStep);
-            setCompletedStepText(st.completedStepText || '');
-            isInitializedRef.current = true;
-            scheduleReliableScrollRestore(st.scrollPosition ?? 0);
-            setTimeout(() => {
-              try {
-                persistChatStateNowRef.current?.({ force: true });
-              } catch {}
-            }, 0);
-          }
+        const modes = ['pro', 'create', 'learn'] as const;
+        const currentCount = modeStatesRef.current[previousModeRef.current || 'learn']?.messages?.length || 0;
+        const best = modes
+          .map((m) => ({ m, count: modeStatesRef.current[m]?.messages?.length || 0 }))
+          .sort((a, b) => b.count - a.count)[0];
+        if (best && best.count > currentCount && best.count > 0) {
+          const st = modeStatesRef.current[best.m];
+          previousModeRef.current = best.m;
+          forcedProHydrateRef.current = forcedProHydrateRef.current || best.m === 'pro';
+          setSelectedLearnLevel(best.m);
+          setMessages([...(st.messages || [])]);
+          setCurrentStep(st.currentStep || 0);
+          setShowOptions(!!st.showOptions);
+          setShowGenres(!!st.showGenres);
+          setShowReadyButton(!!st.showReadyButton);
+          setShowCompletedStep(!!st.showCompletedStep);
+          setCompletedStepText(st.completedStepText || '');
+          isInitializedRef.current = true;
+          scheduleReliableScrollRestore(st.scrollPosition ?? 0);
+          setTimeout(() => {
+            try {
+              persistChatStateNowRef.current?.({ force: true });
+            } catch {}
+          }, 0);
         }
       } catch {}
 
