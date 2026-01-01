@@ -516,29 +516,24 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
       let session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
-      // Fallback: if current project session is missing, reuse the most recent session we have.
+      // If current project session is missing, initialize a blank session instead of reusing another project.
       if (hasSessions && sessionKey && !session) {
+        session = {
+          modeStates: {
+            learn: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
+            create: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
+            pro: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
+          },
+          selectedLearnLevel: 'learn',
+          completedSteps: 0,
+          hasCompletedAnalysis: false,
+        };
+        resolvedSessionKey = sessionKey;
+        lastSessionKeyRef.current = sessionKey;
+        const line = `HYDRATE_INIT_NEW | initialized empty session for ${sessionKey}`;
+        console.log('[FunctionalChat]', line);
         try {
-          const keys = Object.keys(parsed.sessions || {});
-          // Pick the latest by numeric suffix (project id) to stay deterministic.
-          const fallbackKey = keys
-            .map((k) => {
-              const parts = k.split(':');
-              const num = Number(parts[parts.length - 1]) || 0;
-              return { k, num };
-            })
-            .sort((a, b) => a.num - b.num)
-            .slice(-1)[0]?.k;
-          if (fallbackKey) {
-            session = parsed.sessions[fallbackKey];
-            resolvedSessionKey = fallbackKey;
-            lastSessionKeyRef.current = fallbackKey;
-            const line = `HYDRATE_FALLBACK | missing session for ${sessionKey}, using ${fallbackKey}`;
-            console.log('[FunctionalChat]', line);
-            try {
-              (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
-            } catch {}
-          }
+          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
         } catch {}
       }
 
@@ -565,11 +560,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // If we have per-project sessions but no project selected yet, do not hydrate anything.
       // This avoids accidentally showing the last opened project's chat for every project.
       if (hasSessions && !resolvedSessionKey) {
-        return false;
-      }
-
-      // v2 behavior: if we have sessions but none for this project, do NOT fall back to another project's state
-      if (hasSessions && resolvedSessionKey && !session) {
         return false;
       }
 
