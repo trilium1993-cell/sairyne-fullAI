@@ -31,6 +31,19 @@ const pendingSqliteSaveTimer: Map<string, number> = new Map();
 const pendingSqliteSaveValue: Map<string, string> = new Map();
 const pendingSqliteLoads: Set<string> = new Set();
 
+function sendDebugLog(message: string) {
+  try {
+    const backend = (window as any)?.__JUCE__?.backend;
+    if (backend && typeof backend.emitEvent === 'function') {
+      backend.emitEvent('debugLog', { message });
+      return;
+    }
+  } catch {}
+  try {
+    if (typeof console !== 'undefined' && console.debug) console.debug(message);
+  } catch {}
+}
+
 // Keys that can be very large and/or updated frequently.
 // NOTE: chat-state is handled with special logic in embedded mode (compressed + short debounce),
 // so we don't include it here.
@@ -276,6 +289,7 @@ export function safeGetItem(key: string): string | null {
     const sqlite = getSqliteBridge();
     if (sqlite && !pendingSqliteLoads.has(key)) {
       pendingSqliteLoads.add(key);
+      sendDebugLog(`[Storage] sqlite.load request key=${key}`);
       sqlite
         .load(key)
         .then((value) => {
@@ -288,6 +302,7 @@ export function safeGetItem(key: string): string | null {
             } catch {}
           }
           memoryStorage.set(key, normalized);
+          sendDebugLog(`[Storage] sqlite.load ok key=${key} len=${normalized.length}`);
           if (IS_DEV) console.log('[Storage] ✅ Retrieved from SQLite:', key, `value length: ${normalized.length}`);
           // Dispatch to trigger hydration listeners (even for chat state).
           if (typeof window !== 'undefined') {
@@ -378,6 +393,7 @@ export function safeSetItem(key: string, value: string): boolean {
           try {
             const latest = pendingSqliteSaveValue.get(key);
             if (typeof latest !== 'string') return;
+            sendDebugLog(`[Storage] sqlite.save key=${key} len=${latest.length}`);
             sqlite.save(key, latest);
             lastSentToSqliteAt.set(key, Date.now());
             lastSentToSqliteValue.set(key, latest);
