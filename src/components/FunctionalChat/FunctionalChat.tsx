@@ -614,7 +614,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         };
       }
 
-      // If Pro has messages, force UI to Pro and show them.
+      // If Pro has messages, force UI to Pro and show them immediately.
       try {
         const proState = modeStatesRef.current.pro;
         const proCount = proState?.messages?.length || 0;
