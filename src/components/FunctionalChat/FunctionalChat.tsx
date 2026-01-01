@@ -196,6 +196,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const lastModeWriteAtRef = useRef(0);
   // Track per-session mode initialization to avoid repeatedly resetting mode (learn/pro ping-pong)
   const modeInitializedRef = useRef<Record<string, boolean>>({});
+  // When hydration forces Pro (because messages exist), prevent storage from overwriting back to Learn/Create.
+  const forcedProHydrateRef = useRef(false);
   const [learnModeAIActive, setLearnModeAIActive] = useState(false); // Флаг для AI диалога в Learn mode
   const [showVisualTips, setShowVisualTips] = useState(false);
   const [showProjectAnalysis, setShowProjectAnalysis] = useState(false);
@@ -350,6 +352,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const apply = (raw: string | null) => {
       const v = String(raw || '').trim();
       if (v === 'learn' || v === 'create' || v === 'pro') {
+        if (forcedProHydrateRef.current && v !== 'pro') return;
         // Ignore stale remote writes that arrive immediately after a local change.
         if (lastModeWriteAtRef.current && Date.now() - lastModeWriteAtRef.current < 1500) return;
         modeInitializedRef.current[sessionKey] = true;
@@ -382,6 +385,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!sessionKey) return;
     const hasPersisted = hasPersistedMessagesForSession(sessionKey);
     if (hasPersisted === false && !modeInitializedRef.current[sessionKey]) {
+      if (forcedProHydrateRef.current) {
+        return;
+      }
       if (previousModeRef.current !== 'learn') {
         previousModeRef.current = 'learn';
         setSelectedLearnLevel('learn');
@@ -620,6 +626,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         const proCount = proState?.messages?.length || 0;
         if (proCount > 0) {
           previousModeRef.current = 'pro';
+          forcedProHydrateRef.current = true;
           setSelectedLearnLevel('pro');
           setMessages([...(proState.messages || [])]);
           setCurrentStep(proState.currentStep || 0);
