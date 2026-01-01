@@ -506,6 +506,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
       // Backward-compat: old format (no sessions) treated as current session (will be migrated on next save)
       const effective = session && typeof session === 'object' ? session : parsed;
+      // Drop any stale pending AI payload so UI doesn't wait for a finished response after reopen.
+      if (effective && typeof effective === 'object' && (effective as any).pendingAi) {
+        try {
+          delete (effective as any).pendingAi;
+        } catch {}
+      }
 
       if (typeof effective.selectedLearnLevel === 'string') {
         setSelectedLearnLevel(effective.selectedLearnLevel);
@@ -942,10 +948,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!root || typeof root !== 'object') root = {};
     if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
     root.v = 2;
-    // Preserve transient per-session metadata (e.g. pending AI request) across normal state saves.
-    const prevSession = root.sessions[sessionKey];
-    const pendingAi = prevSession && typeof prevSession === 'object' ? (prevSession as any).pendingAi : undefined;
-    root.sessions[sessionKey] = pendingAi ? { ...sessionPayload, pendingAi } : sessionPayload;
+    // Do NOT persist pendingAi; it can leave the session "stuck" on reopen.
+    root.sessions[sessionKey] = sessionPayload;
     root.savedAt = Date.now();
 
     safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
