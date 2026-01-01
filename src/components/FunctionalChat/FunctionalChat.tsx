@@ -520,25 +520,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
       let session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
-      // If current project session is missing, initialize a blank session instead of reusing another project.
+      // If current project session is missing, bail out (wait for next inject) instead of creating empty.
       if (hasSessions && sessionKey && !session) {
-        session = {
-          modeStates: {
-            learn: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
-            create: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
-            pro: { messages: [], currentStep: 0, scrollPosition: 0, showOptions: false, showGenres: false, showReadyButton: false, showCompletedStep: false, completedStepText: '' },
-          },
-          selectedLearnLevel: 'learn',
-          completedSteps: 0,
-          hasCompletedAnalysis: false,
-        };
-        resolvedSessionKey = sessionKey;
-        lastSessionKeyRef.current = sessionKey;
-        const line = `HYDRATE_INIT_NEW | initialized empty session for ${sessionKey}`;
-        console.log('[FunctionalChat]', line);
-        try {
-          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
-        } catch {}
+        return false;
       }
 
       try {
