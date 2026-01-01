@@ -1447,6 +1447,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       };
       return next;
     });
+    try {
+      persistChatStateNowRef.current?.({ force: true });
+    } catch {}
     // Scroll to the new message once when it appears
     scrollToNewMessage();
   };
@@ -1480,6 +1483,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         };
         return next;
       });
+      try {
+        persistChatStateNowRef.current?.({ force: true });
+      } catch {}
       // Force a persist right away in embed to capture the last AI message.
       if (isEmbedded) {
         setTimeout(() => {
