@@ -1403,10 +1403,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   // Создаем шаги чата с актуальным названием проекта
   const chatSteps = createChatSteps(projectName);
 
+  const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
   // Добавляем пользовательское сообщение
   const addUserMessage = (content: string) => {
     const message: Message = {
-      id: `user-${Date.now()}`,
+      id: makeId('user'),
       type: 'user',
       content,
       timestamp: Date.now(),
@@ -1444,7 +1446,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const addAIMessageInstant = useCallback(
     (content: string) => {
       const message: Message = {
-        id: `ai-${Date.now()}`,
+        id: makeId('ai'),
         type: 'ai',
         content,
         timestamp: Date.now(),
