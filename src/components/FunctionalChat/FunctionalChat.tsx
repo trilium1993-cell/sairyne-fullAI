@@ -496,6 +496,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       }
       const parsed = safeJsonParse<any>(raw, null);
       if (!parsed || typeof parsed !== 'object') return false;
+      // v2+: per-project sessions
+      const sessionKey = resolveActiveSessionKey();
+      try {
+        const keys = parsed?.sessions ? Object.keys(parsed.sessions) : [];
+        const line = `HYDRATE_SESSION | sessionKey=${sessionKey || 'null'} | sessions=${keys.join(',')}`;
+        console.log('[FunctionalChat]', line);
+        try {
+          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+        } catch {}
+      } catch {}
+      const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
+      const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
+
       try {
         const effectiveForLog = session && typeof session === 'object' ? session : parsed;
         const modeStates = effectiveForLog?.modeStates || {};
@@ -515,19 +528,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
         } catch {}
       } catch {}
-
-      // v2+: per-project sessions
-      const sessionKey = resolveActiveSessionKey();
-      try {
-        const keys = parsed?.sessions ? Object.keys(parsed.sessions) : [];
-        const line = `HYDRATE_SESSION | sessionKey=${sessionKey || 'null'} | sessions=${keys.join(',')}`;
-        console.log('[FunctionalChat]', line);
-        try {
-          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
-        } catch {}
-      } catch {}
-      const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
-      const session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
       // If we have per-project sessions but no project selected yet, do not hydrate anything.
       // This avoids accidentally showing the last opened project's chat for every project.
