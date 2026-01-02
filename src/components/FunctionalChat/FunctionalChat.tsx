@@ -220,6 +220,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const isEmbedded = resolveIsEmbedded();
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
+  const [hydratedGuardTick, setHydratedGuardTick] = useState(0);
   // Prevent the "first workflow prompt" from flashing before persisted state is hydrated.
   const [isHydrationGateReady, setIsHydrationGateReady] = useState(false);
   const hydrationTimerRef = useRef<number | null>(null);
@@ -294,7 +295,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       clearTimeout(t2);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLearnLevel]);
+  }, [selectedLearnLevel, hydratedGuardTick]);
 
   // Global cursor spinner for "wait" states in chat (AI thinking / reconnecting / hydration).
   useEffect(() => {
@@ -386,6 +387,7 @@ const enforceHydratedMessages = (
     hydratedGuardRef.minLen = normalized.length;
     hydratedGuardRef.lockedMode = mode;
     hydratedGuardRef.cached = [...normalized];
+    setHydratedGuardTick((t) => t + 1);
     if (mode) {
       const existing = modeStatesRef.current[mode] || {
         messages: [],
@@ -866,6 +868,7 @@ const ensureUniqueMessageIds = (msgs: Message[]): Message[] => {
                 hydratedGuardRef.minLen = target.length;
                 hydratedGuardRef.lockedMode = 'pro';
                 hydratedGuardRef.cached = [...target];
+      setHydratedGuardTick((t) => t + 1);
                 const existing = modeStatesRef.current['pro'] || {
                   messages: [],
                   currentStep: 0,
@@ -939,6 +942,7 @@ const ensureUniqueMessageIds = (msgs: Message[]): Message[] => {
               hydratedGuardRef.minLen = target.length;
               hydratedGuardRef.lockedMode = active;
               hydratedGuardRef.cached = [...target];
+              setHydratedGuardTick((t) => t + 1);
               const existing = modeStatesRef.current[active] || {
                 messages: [],
                 currentStep: 0,
@@ -1005,6 +1009,7 @@ const ensureUniqueMessageIds = (msgs: Message[]): Message[] => {
                 hydratedGuardRef.minLen = target.length;
                 hydratedGuardRef.lockedMode = best.m;
                 hydratedGuardRef.cached = [...target];
+              setHydratedGuardTick((t) => t + 1);
                 const existing = modeStatesRef.current[best.m] || {
                   messages: [],
                   currentStep: 0,
