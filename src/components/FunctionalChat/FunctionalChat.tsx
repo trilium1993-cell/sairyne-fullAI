@@ -353,6 +353,17 @@ const enforceHydratedMessages = (
   persistChatStateNowRef: React.MutableRefObject<((opts?: { force?: boolean }) => void) | null>,
   resolveActiveSessionKey: () => string | null
 ) => {
+  const reassertHydratedTarget = (label?: string, extra?: any) => {
+    setMessages(target);
+    messagesRef.current = [...target];
+    hydratedGuardRef.sessionKey = sessionKey;
+    hydratedGuardRef.mode = mode;
+    hydratedGuardRef.minLen = target.length;
+    hydratedGuardRef.lockedMode = mode;
+    hydratedGuardRef.cached = [...target];
+    if (DEBUG_TRACE) traceLog(label || 'HYDRATE_REAPPLY_FORCE', { sessionKey, mode, targetLen: target.length, ...(extra || {}) });
+  };
+
   setMessages(target);
   messagesRef.current = [...target];
   hydratedGuardRef.sessionKey = sessionKey;
@@ -372,14 +383,7 @@ const enforceHydratedMessages = (
       if (activeKey === sessionKey) {
         const uiLen = messagesRef.current?.length || 0;
         if (uiLen < target.length) {
-          setMessages(target);
-          messagesRef.current = [...target];
-          hydratedGuardRef.sessionKey = sessionKey;
-          hydratedGuardRef.mode = mode;
-          hydratedGuardRef.minLen = target.length;
-          hydratedGuardRef.lockedMode = mode;
-          hydratedGuardRef.cached = [...target];
-          if (DEBUG_TRACE) traceLog('HYDRATE_ENFORCE', { sessionKey, mode, targetLen: target.length, uiLen, delay });
+          reassertHydratedTarget('HYDRATE_ENFORCE', { uiLen, delay });
           try {
             persistChatStateNowRef.current?.({ force: true });
           } catch {}
@@ -793,12 +797,12 @@ const enforceHydratedMessages = (
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
           // Safety: re-apply after render to avoid any late clobber (multiple retries).
-          [40, 120, 260].forEach((delay) => {
+          const target = proState.messages || [];
+          const reapply = (delay?: number) => {
             setTimeout(() => {
               const activeKey = resolveActiveSessionKey();
               if (activeKey === (resolvedSessionKey || sessionKey)) {
                 const uiCount = messagesRef.current?.length || 0;
-                const target = proState.messages || [];
                 if (uiCount < target.length) {
                   setMessages([...target]);
                   messagesRef.current = [...target];
@@ -811,8 +815,11 @@ const enforceHydratedMessages = (
                   // No extra persist here; state already saved on first apply.
                 }
               }
-            }, delay);
-          });
+            }, delay ?? 0);
+          };
+          [40, 120, 260].forEach((delay) => reapply(delay));
+          // Fallback after 500ms in case a very late render shrinks the list.
+          reapply(500);
           try {
             lastSessionKeyRef.current = resolvedSessionKey || sessionKey || lastSessionKeyRef.current;
             setIsProjectSessionReady(true);
@@ -851,12 +858,12 @@ const enforceHydratedMessages = (
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
-        [40, 120, 260].forEach((delay) => {
+        const target = savedState.messages || [];
+        const reapply = (delay?: number) => {
           setTimeout(() => {
             const activeKey = resolveActiveSessionKey();
             if (activeKey === (resolvedSessionKey || sessionKey)) {
               const uiCount = messagesRef.current?.length || 0;
-              const target = savedState.messages || [];
               if (uiCount < target.length) {
                 setMessages([...target]);
                 messagesRef.current = [...target];
@@ -869,8 +876,10 @@ const enforceHydratedMessages = (
                 // No extra persist here; state already saved on first apply.
               }
             }
-          }, delay);
-        });
+          }, delay ?? 0);
+        };
+        [40, 120, 260].forEach((d) => reapply(d));
+        reapply(500);
         if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_ACTIVE', { sessionKey: resolvedSessionKey || sessionKey, active, count: savedState.messages.length });
       }
 
@@ -903,12 +912,12 @@ const enforceHydratedMessages = (
           isInitializedRef.current = true;
           scheduleReliableScrollRestore(st.scrollPosition ?? 0);
           if (DEBUG_TRACE) traceLog('HYDRATE_SWITCH_TO_MAX_MODE', { sessionKey: resolvedSessionKey || sessionKey, mode: best.m, count: st.messages.length });
-          [40, 120, 260].forEach((delay) => {
+          const target = st.messages || [];
+          const reapply = (delay?: number) => {
             setTimeout(() => {
               const activeKey = resolveActiveSessionKey();
               if (activeKey === (resolvedSessionKey || sessionKey)) {
                 const uiCount = messagesRef.current?.length || 0;
-                const target = st.messages || [];
                 if (uiCount < target.length) {
                   setMessages([...target]);
                   messagesRef.current = [...target];
@@ -921,8 +930,10 @@ const enforceHydratedMessages = (
                   // No extra persist here; state already saved on first apply.
                 }
               }
-            }, delay);
-          });
+            }, delay ?? 0);
+          };
+          [40, 120, 260].forEach((d) => reapply(d));
+          reapply(500);
         }
       } catch {}
 
