@@ -709,6 +709,15 @@ const traceLog = (label: string, payload?: any) => {
             isInitializedRef.current = true;
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
+          // Safety: re-apply after render to avoid any late clobber.
+          setTimeout(() => {
+            const activeKey = resolveActiveSessionKey();
+            if (activeKey === (resolvedSessionKey || sessionKey)) {
+              setMessages([...(proState.messages || [])]);
+              messagesRef.current = [...(proState.messages || [])];
+              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: proState.messages?.length || 0 });
+            }
+          }, 40);
           try {
             lastSessionKeyRef.current = resolvedSessionKey || sessionKey || lastSessionKeyRef.current;
             setIsProjectSessionReady(true);
@@ -743,6 +752,14 @@ const traceLog = (label: string, payload?: any) => {
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
+        setTimeout(() => {
+          const activeKey = resolveActiveSessionKey();
+          if (activeKey === (resolvedSessionKey || sessionKey)) {
+            setMessages([...(savedState.messages || [])]);
+            messagesRef.current = [...(savedState.messages || [])];
+            if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: savedState.messages?.length || 0 });
+          }
+        }, 40);
         if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_ACTIVE', { sessionKey: resolvedSessionKey || sessionKey, active, count: savedState.messages.length });
       }
 
@@ -771,6 +788,14 @@ const traceLog = (label: string, payload?: any) => {
           isInitializedRef.current = true;
           scheduleReliableScrollRestore(st.scrollPosition ?? 0);
           if (DEBUG_TRACE) traceLog('HYDRATE_SWITCH_TO_MAX_MODE', { sessionKey: resolvedSessionKey || sessionKey, mode: best.m, count: st.messages.length });
+          setTimeout(() => {
+            const activeKey = resolveActiveSessionKey();
+            if (activeKey === (resolvedSessionKey || sessionKey)) {
+              setMessages([...(st.messages || [])]);
+              messagesRef.current = [...(st.messages || [])];
+              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: st.messages?.length || 0 });
+            }
+          }, 40);
         }
       } catch {}
 
