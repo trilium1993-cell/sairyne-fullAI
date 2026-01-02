@@ -915,6 +915,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const base = messagesRef.current || [];
       const snapshot = [...base, finalMsg];
       snapshotActiveModeMessages(snapshot);
+      // Ensure persist sees the newest snapshot even before React state updates.
+      messagesRef.current = snapshot;
       persistChatStateNowRef.current?.({ force: true });
     } catch {}
 
@@ -1636,6 +1638,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // Persist on next tick so messagesRef is up-to-date.
       setTimeout(() => {
         try {
+          // Ensure persist sees the latest snapshot immediately.
+          messagesRef.current = modeStatesRef.current[selectedLearnLevel || previousModeRef.current || 'learn']?.messages || messagesRef.current;
           persistChatStateNowRef.current?.({ force: true });
         } catch {}
       }, 0);
