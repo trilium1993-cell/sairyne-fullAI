@@ -289,6 +289,17 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const CHAT_STATE_KEY = 'sairyne_functional_chat_state_v1';
   const MAX_MESSAGES_PER_MODE = 200;
   const TOMBSTONE = '0';
+const DEBUG_TRACE = true;
+const traceLog = (label: string, payload?: any) => {
+  try {
+    const ts = new Date().toISOString();
+    const line = payload ? `[FunctionalChat][${ts}] ${label} | ${JSON.stringify(payload)}` : `[FunctionalChat][${ts}] ${label}`;
+    console.log(line);
+    try {
+      (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
+    } catch {}
+  } catch {}
+};
   const resolveActiveSessionKey = () => {
     const selected = getSelectedProject();
     // If no project selected yet, do NOT reuse any previous chat session.
@@ -346,6 +357,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     lastFinalPersistRef.current = 0;
     lastFinalMessagesLenRef.current = 0;
     const hasPersisted = hasPersistedMessagesForSession(sessionKey);
+    if (DEBUG_TRACE) traceLog('HYDRATE_GATE_START', { sessionKey, hasPersisted });
     setIsHydrationGateReady(false);
     if (hasPersisted === true) {
       expectingHydrationRef.current = true;
@@ -528,11 +540,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     try {
       try {
         const sessionKey = resolveActiveSessionKey();
-        const msg = `[FunctionalChat] TRY_HYDRATE sessionKey=${sessionKey || 'null'}`;
-        console.log(msg);
-        try {
-          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: msg });
-        } catch {}
+        if (DEBUG_TRACE) traceLog('TRY_HYDRATE', { sessionKey });
       } catch {}
 
       const raw = safeGetItem(CHAT_STATE_KEY);
@@ -579,6 +587,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         expectingHydrationRef.current = false;
         hydrationPersistLockRef.current = { sessionKey, unlocked: true };
         lastSessionKeyRef.current = sessionKey;
+        if (DEBUG_TRACE) traceLog('HYDRATE_INIT_EMPTY_SESSION', { sessionKey });
         return true;
       }
 
@@ -595,11 +604,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
               : '';
           dbg.push(`${m}: ${Array.isArray(list) ? list.length : 0} last="${preview}"`);
         });
-        const line = dbg.join(' | ');
-        console.log('[FunctionalChat]', line);
-        try {
-          (window as any)?.__JUCE__?.backend?.emitEvent?.('debugLog', { message: line });
-        } catch {}
+        traceLog(dbg.join(' | '));
       } catch {}
 
       // If we have per-project sessions but no project selected yet, do not hydrate anything.
@@ -709,6 +714,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             expectingHydrationRef.current = false;
             hydrationPersistLockRef.current = { sessionKey: resolvedSessionKey || sessionKey || null, unlocked: false };
           } catch {}
+          if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_PRO', { sessionKey: resolvedSessionKey || sessionKey, proCount });
           return true;
         }
       } catch {}
@@ -733,6 +739,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
+        if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_ACTIVE', { sessionKey: resolvedSessionKey || sessionKey, active, count: savedState.messages.length });
       }
 
       // If active mode has fewer messages than another mode, switch to the mode with the most messages.
@@ -757,6 +764,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           setCompletedStepText(st.completedStepText || '');
           isInitializedRef.current = true;
           scheduleReliableScrollRestore(st.scrollPosition ?? 0);
+          if (DEBUG_TRACE) traceLog('HYDRATE_SWITCH_TO_MAX_MODE', { sessionKey: resolvedSessionKey || sessionKey, mode: best.m, count: st.messages.length });
         }
       } catch {}
 
@@ -765,6 +773,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         setIsHydrationGateReady(true);
         expectingHydrationRef.current = false;
         hydrationPersistLockRef.current = { sessionKey: resolvedSessionKey || sessionKey || null, unlocked: false };
+        traceLog('HYDRATE_DONE', {
+          sessionKey: resolvedSessionKey || sessionKey || null,
+          learn: modeStatesRef.current.learn?.messages?.length || 0,
+          create: modeStatesRef.current.create?.messages?.length || 0,
+          pro: modeStatesRef.current.pro?.messages?.length || 0,
+          selectedLearnLevel,
+        });
       } catch {}
 
       return true;
@@ -930,6 +945,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isTyping: true,
       isThinking
     };
+    if (DEBUG_TRACE) traceLog('ADD_AI_MESSAGE_START', { id: message.id, sessionKey: resolveActiveSessionKey(), mode: selectedLearnLevel });
 
     // Snapshot full content immediately for persistence even while animating typing
     try {
@@ -940,6 +956,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // Ensure persist sees the newest snapshot even before React state updates.
       messagesRef.current = snapshot;
       persistChatStateNowRef.current?.({ force: true });
+      if (DEBUG_TRACE) traceLog('ADD_AI_MESSAGE_FORCE_PERSIST_SNAPSHOT', { id: message.id, len: snapshot.length });
     } catch {}
 
     setMessages(prev => {
@@ -978,6 +995,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         // Force-persist final AI text so it isn't dropped by typing filter.
         try {
           persistChatStateNowRef.current?.({ force: true });
+          if (DEBUG_TRACE) traceLog('ADD_AI_MESSAGE_DONE', { id: message.id, sessionKey: resolveActiveSessionKey(), len: (messagesRef.current || []).length });
         } catch {}
         if (onComplete) {
           onComplete();
@@ -1132,15 +1150,18 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const currentMessagesLen = Math.max(messagesRef.current?.length ?? 0, messages.length);
     // Avoid persisting while hydration gate is closed unless explicitly forced.
     if (!isHydrationGateReady && !force) {
+      if (DEBUG_TRACE) traceLog('PERSIST_SKIP_GATE_CLOSED', { sessionKey, currentMessagesLen });
       return;
     }
     // If we have a recent final snapshot and no new messages, block non-force persists to avoid overwriting.
     if (!force && lastFinalPersistRef.current && currentMessagesLen <= (lastFinalMessagesLenRef.current || 0)) {
+      if (DEBUG_TRACE) traceLog('PERSIST_SKIP_LAST_FINAL_LOCK', { sessionKey, currentMessagesLen, lastFinalMessagesLen: lastFinalMessagesLenRef.current, lastFinalPersistAt: lastFinalPersistRef.current });
       return;
     }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
     // If AI message is still typing and not forced, skip to avoid persisting empty content.
     if (!force && (messagesRef.current || []).some((m) => (m as any)?.isTyping === true)) {
+      if (DEBUG_TRACE) traceLog('PERSIST_SKIP_TYPING', { sessionKey });
       return;
     }
     if (
@@ -1148,6 +1169,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       hydrationPersistLockRef.current.unlocked === false &&
       !force
     ) {
+      if (DEBUG_TRACE) traceLog('PERSIST_SKIP_HYDRATION_LOCK', { sessionKey });
       return;
     }
     try {
@@ -1165,6 +1187,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         const now = Date.now();
         const isHidden = typeof document !== 'undefined' ? Boolean(document.hidden) : false;
         if (isEmbedded && !isHidden && now - lastPersistAtRef.current < 4000) {
+          if (DEBUG_TRACE) traceLog('PERSIST_SKIP_THROTTLE', { sessionKey });
           return;
         }
         lastPersistAtRef.current = now;
@@ -1238,6 +1261,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       modeStates: cappedModeStates,
       savedAt: Date.now(),
     };
+    if (DEBUG_TRACE) traceLog('PERSIST_BUILD_PAYLOAD', { sessionKey, counts: { learn: cappedModeStates.learn?.messages?.length || 0, create: cappedModeStates.create?.messages?.length || 0, pro: cappedModeStates.pro?.messages?.length || 0 }, force });
 
     // Store per-project session inside a single persisted key (so C++ inject can stay simple)
     let root: any = {};
@@ -1271,6 +1295,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     root.sessions[sessionKey] = sessionPayload;
     root.savedAt = Date.now();
 
+    if (DEBUG_TRACE) {
+      traceLog('PERSIST_WRITE', {
+        sessionKey,
+        len: JSON.stringify(root)?.length || 0,
+        force,
+        savedAt: root.savedAt,
+      });
+    }
     safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
     if (force) {
       lastFinalPersistRef.current = Date.now();
@@ -1311,6 +1343,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         window.clearTimeout(pendingAutoPersistTimerRef.current);
         pendingAutoPersistTimerRef.current = null;
       }
+      if (DEBUG_TRACE) traceLog('PERSIST_AUTOSAVE_EFFECT_CLEANUP');
     };
   }, [persistChatStateNow, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
@@ -1346,6 +1379,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           sessionKey: resolveActiveSessionKey(),
           unlocked: true,
         };
+        if (DEBUG_TRACE) traceLog('FORCE_FLUSH', { sessionKey: resolveActiveSessionKey(), len: messagesRef.current?.length || 0 });
       } catch {}
     };
     try {
@@ -1588,6 +1622,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       content,
       timestamp: Date.now(),
     };
+  if (DEBUG_TRACE) traceLog('ADD_USER_MESSAGE', { id: message.id, sessionKey: resolveActiveSessionKey(), mode: selectedLearnLevel });
 
     setMessages(prev => {
       const next = [...prev, message];
@@ -1635,6 +1670,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         isTyping: false,
         isThinking: false,
       };
+      if (DEBUG_TRACE) traceLog('ADD_AI_INSTANT', { id: message.id, sessionKey: resolveActiveSessionKey(), mode: selectedLearnLevel });
       setMessages((prev) => {
         const next = [...prev, message];
         const mode = selectedLearnLevel || previousModeRef.current || 'learn';
@@ -1660,6 +1696,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           // Ensure persist sees the latest snapshot immediately.
           messagesRef.current = modeStatesRef.current[selectedLearnLevel || previousModeRef.current || 'learn']?.messages || messagesRef.current;
           persistChatStateNowRef.current?.({ force: true });
+          if (DEBUG_TRACE) traceLog('ADD_AI_INSTANT_FORCE_PERSIST', { id: message.id, len: messagesRef.current?.length || 0 });
         } catch {}
       }, 0);
       scrollToNewMessage();
