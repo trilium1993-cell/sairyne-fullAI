@@ -246,8 +246,24 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const scrollRestoreAttemptsRef = useRef(0);
 
   useEffect(() => {
+    const sessionKey = resolveActiveSessionKey();
+    const guard = hydratedGuardRef;
+    // Guard: prevent late renders from dropping messages below hydrated minLen for this session/mode.
+    if (
+      guard.sessionKey &&
+      guard.mode &&
+      sessionKey === guard.sessionKey &&
+      (selectedLearnLevel === guard.mode || previousModeRef.current === guard.mode) &&
+      messagesRef.current &&
+      messagesRef.current.length < guard.minLen &&
+      messages.length < guard.minLen
+    ) {
+      // Ignore this render update; keep the higher-count messagesRef.
+      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_SKIP_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
+      return;
+    }
     messagesRef.current = messages;
-  }, [messages]);
+  }, [messages, selectedLearnLevel]);
 
   // Global cursor spinner for "wait" states in chat (AI thinking / reconnecting / hydration).
   useEffect(() => {
@@ -290,6 +306,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const MAX_MESSAGES_PER_MODE = 200;
   const TOMBSTONE = '0';
 const DEBUG_TRACE = true;
+const hydratedGuardRef: { sessionKey: string | null; mode: string | null; minLen: number } = {
+  sessionKey: null,
+  mode: null,
+  minLen: 0,
+};
 const traceLog = (label: string, payload?: any) => {
   try {
     const ts = new Date().toISOString();
@@ -699,6 +720,9 @@ const traceLog = (label: string, payload?: any) => {
           messagesRef.current = [...(proState.messages || [])];
           lastFinalMessagesLenRef.current = proState.messages?.length || 0;
           lastFinalPersistRef.current = 0;
+          hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
+          hydratedGuardRef.mode = 'pro';
+          hydratedGuardRef.minLen = proState.messages?.length || 0;
           setCurrentStep(proState.currentStep || 0);
           setShowOptions(!!proState.showOptions);
           setShowGenres(!!proState.showGenres);
@@ -720,6 +744,9 @@ const traceLog = (label: string, payload?: any) => {
                 messagesRef.current = [...target];
                 lastFinalMessagesLenRef.current = target.length;
                 lastFinalPersistRef.current = 0;
+                hydratedGuardRef.sessionKey = activeKey;
+                hydratedGuardRef.mode = 'pro';
+                hydratedGuardRef.minLen = target.length;
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount });
                 try {
                   persistChatStateNowRef.current?.({ force: true });
@@ -747,6 +774,9 @@ const traceLog = (label: string, payload?: any) => {
         messagesRef.current = [...savedState.messages];
         lastFinalMessagesLenRef.current = savedState.messages?.length || 0;
         lastFinalPersistRef.current = 0;
+        hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
+        hydratedGuardRef.mode = active;
+        hydratedGuardRef.minLen = savedState.messages?.length || 0;
         setCurrentStep(savedState.currentStep);
         setShowOptions(savedState.showOptions);
         setShowGenres(savedState.showGenres);
@@ -771,6 +801,9 @@ const traceLog = (label: string, payload?: any) => {
               messagesRef.current = [...target];
               lastFinalMessagesLenRef.current = target.length;
               lastFinalPersistRef.current = 0;
+              hydratedGuardRef.sessionKey = activeKey;
+              hydratedGuardRef.mode = active;
+              hydratedGuardRef.minLen = target.length;
               if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount });
               try {
                 persistChatStateNowRef.current?.({ force: true });
@@ -797,6 +830,9 @@ const traceLog = (label: string, payload?: any) => {
           messagesRef.current = [...(st.messages || [])];
           lastFinalMessagesLenRef.current = st.messages?.length || 0;
           lastFinalPersistRef.current = 0;
+          hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
+          hydratedGuardRef.mode = best.m;
+          hydratedGuardRef.minLen = st.messages?.length || 0;
           setCurrentStep(st.currentStep || 0);
           setShowOptions(!!st.showOptions);
           setShowGenres(!!st.showGenres);
@@ -816,6 +852,9 @@ const traceLog = (label: string, payload?: any) => {
                 messagesRef.current = [...target];
                 lastFinalMessagesLenRef.current = target.length;
                 lastFinalPersistRef.current = 0;
+                hydratedGuardRef.sessionKey = activeKey;
+                hydratedGuardRef.mode = best.m;
+                hydratedGuardRef.minLen = target.length;
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount });
                 try {
                   persistChatStateNowRef.current?.({ force: true });
@@ -995,6 +1034,9 @@ const traceLog = (label: string, payload?: any) => {
       };
     }
     lastFinalPersistRef.current = 0;
+    hydratedGuardRef.sessionKey = null;
+    hydratedGuardRef.mode = null;
+    hydratedGuardRef.minLen = 0;
     const message: Message = {
       id: makeId('ai'),
       type: 'ai',
@@ -1674,6 +1716,9 @@ const traceLog = (label: string, payload?: any) => {
     };
   }
   lastFinalPersistRef.current = 0;
+  hydratedGuardRef.sessionKey = null;
+  hydratedGuardRef.mode = null;
+  hydratedGuardRef.minLen = 0;
     const message: Message = {
       id: makeId('user'),
       type: 'user',
@@ -1720,6 +1765,9 @@ const traceLog = (label: string, payload?: any) => {
       };
     }
     lastFinalPersistRef.current = 0;
+    hydratedGuardRef.sessionKey = null;
+    hydratedGuardRef.mode = null;
+    hydratedGuardRef.minLen = 0;
       const message: Message = {
         id: makeId('ai'),
         type: 'ai',
