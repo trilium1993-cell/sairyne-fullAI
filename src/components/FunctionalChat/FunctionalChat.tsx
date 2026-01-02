@@ -361,6 +361,22 @@ const enforceHydratedMessages = (
     hydratedGuardRef.minLen = target.length;
     hydratedGuardRef.lockedMode = mode;
     hydratedGuardRef.cached = [...target];
+    if (mode) {
+      const existing = modeStatesRef.current[mode] || {
+        messages: [],
+        currentStep: 0,
+        scrollPosition: 0,
+        showOptions: false,
+        showGenres: false,
+        showReadyButton: false,
+        showCompletedStep: false,
+        completedStepText: '',
+      };
+      modeStatesRef.current[mode] = { ...existing, messages: [...target] };
+    }
+    try {
+      persistChatStateNowRef.current?.({ force: true });
+    } catch {}
     if (DEBUG_TRACE) traceLog(label || 'HYDRATE_REAPPLY_FORCE', { sessionKey, mode, targetLen: target.length, ...(extra || {}) });
   };
 
@@ -810,6 +826,20 @@ const enforceHydratedMessages = (
                 hydratedGuardRef.minLen = target.length;
                 hydratedGuardRef.lockedMode = 'pro';
                 hydratedGuardRef.cached = [...target];
+                const existing = modeStatesRef.current['pro'] || {
+                  messages: [],
+                  currentStep: 0,
+                  scrollPosition: 0,
+                  showOptions: false,
+                  showGenres: false,
+                  showReadyButton: false,
+                  showCompletedStep: false,
+                  completedStepText: '',
+                };
+                modeStatesRef.current['pro'] = { ...existing, messages: [...target] };
+                try {
+                  persistChatStateNowRef.current?.({ force: true });
+                } catch {}
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount, delay });
                 // No extra persist here; state already saved on first apply.
               }
@@ -869,6 +899,20 @@ const enforceHydratedMessages = (
               hydratedGuardRef.minLen = target.length;
               hydratedGuardRef.lockedMode = active;
               hydratedGuardRef.cached = [...target];
+              const existing = modeStatesRef.current[active] || {
+                messages: [],
+                currentStep: 0,
+                scrollPosition: 0,
+                showOptions: false,
+                showGenres: false,
+                showReadyButton: false,
+                showCompletedStep: false,
+                completedStepText: '',
+              };
+              modeStatesRef.current[active] = { ...existing, messages: [...target] };
+              try {
+                persistChatStateNowRef.current?.({ force: true });
+              } catch {}
               if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount, delay });
               // No extra persist here; state already saved on first apply.
             }
@@ -921,6 +965,20 @@ const enforceHydratedMessages = (
                 hydratedGuardRef.minLen = target.length;
                 hydratedGuardRef.lockedMode = best.m;
                 hydratedGuardRef.cached = [...target];
+                const existing = modeStatesRef.current[best.m] || {
+                  messages: [],
+                  currentStep: 0,
+                  scrollPosition: 0,
+                  showOptions: false,
+                  showGenres: false,
+                  showReadyButton: false,
+                  showCompletedStep: false,
+                  completedStepText: '',
+                };
+                modeStatesRef.current[best.m] = { ...existing, messages: [...target] };
+                try {
+                  persistChatStateNowRef.current?.({ force: true });
+                } catch {}
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount, delay });
                 // No extra persist here; state already saved on first apply.
               }
