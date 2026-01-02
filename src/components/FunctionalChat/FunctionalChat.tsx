@@ -331,6 +331,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       expectingHydrationRef.current = false;
       return;
     }
+    // Lock persists for this session until user triggers a real change (or we force).
+    hydrationPersistLockRef.current = { sessionKey, unlocked: false };
     // Deterministic gate:
     // - If we already know there are persisted messages for this session, DO NOT open by timeout.
     //   Wait until hydration succeeds (prevents "flash then disappear").
@@ -415,7 +417,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
     modeStatesRef.current = emptyModeStates as any;
     previousModeRef.current = 'learn';
-    hydrationPersistLockRef.current = { sessionKey: null, unlocked: true };
+  hydrationPersistLockRef.current = { sessionKey: null, unlocked: true };
     setSelectedLearnLevel('learn');
     setMessages([]);
     setCurrentStep(0);
