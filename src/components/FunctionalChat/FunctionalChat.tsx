@@ -255,12 +255,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       guard.lockedMode &&
       sessionKey === guard.sessionKey &&
       (selectedLearnLevel === guard.lockedMode || previousModeRef.current === guard.lockedMode) &&
-      messagesRef.current &&
-      messagesRef.current.length >= guard.minLen &&
       messages.length < guard.minLen
     ) {
       // Re-apply guarded state.
-      setMessages(messagesRef.current);
+      setMessages(guard.cached || messagesRef.current || []);
+      messagesRef.current = guard.cached?.length ? [...guard.cached] : messagesRef.current;
       if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_REAPPLY_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
       return;
     }
@@ -324,11 +323,13 @@ const hydratedGuardRef: {
   mode: string | null;
   minLen: number;
   lockedMode: string | null;
+  cached: Message[];
 } = {
   sessionKey: null,
   mode: null,
   minLen: 0,
   lockedMode: null,
+  cached: [],
 };
 const traceLog = (label: string, payload?: any) => {
   try {
@@ -363,6 +364,7 @@ const enforceHydratedMessages = (
   hydratedGuardRef.mode = mode;
   hydratedGuardRef.minLen = target.length;
   hydratedGuardRef.lockedMode = mode;
+  hydratedGuardRef.cached = [...target];
   lastFinalMessagesLenRef.current = target.length;
   lastFinalPersistRef.current = 0;
   try {
@@ -381,6 +383,7 @@ const enforceHydratedMessages = (
           hydratedGuardRef.mode = mode;
           hydratedGuardRef.minLen = target.length;
           hydratedGuardRef.lockedMode = mode;
+          hydratedGuardRef.cached = [...target];
           if (DEBUG_TRACE) traceLog('HYDRATE_ENFORCE', { sessionKey, mode, targetLen: target.length, uiLen, delay });
           try {
             persistChatStateNowRef.current?.({ force: true });
@@ -1092,6 +1095,8 @@ const enforceHydratedMessages = (
     hydratedGuardRef.mode = null;
     hydratedGuardRef.minLen = 0;
     hydratedGuardRef.lockedMode = null;
+    hydratedGuardRef.cached = [];
+    hydratedGuardRef.cached = [];
     hydratedGuardRef.lockedMode = null;
     const message: Message = {
       id: makeId('ai'),
@@ -1776,6 +1781,7 @@ const enforceHydratedMessages = (
   hydratedGuardRef.mode = null;
   hydratedGuardRef.minLen = 0;
   hydratedGuardRef.lockedMode = null;
+  hydratedGuardRef.cached = [];
     const message: Message = {
       id: makeId('user'),
       type: 'user',
