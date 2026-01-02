@@ -377,14 +377,15 @@ const enforceHydratedMessages = (
   persistChatStateNowRef: React.MutableRefObject<((opts?: { force?: boolean }) => void) | null>,
   resolveActiveSessionKey: () => string | null
 ) => {
+  const normalized = ensureUniqueMessageIds(target);
   const reassertHydratedTarget = (label?: string, extra?: any) => {
-    setMessages(target);
-    messagesRef.current = [...target];
+    setMessages(normalized);
+    messagesRef.current = [...normalized];
     hydratedGuardRef.sessionKey = sessionKey;
     hydratedGuardRef.mode = mode;
-    hydratedGuardRef.minLen = target.length;
+    hydratedGuardRef.minLen = normalized.length;
     hydratedGuardRef.lockedMode = mode;
-    hydratedGuardRef.cached = [...target];
+    hydratedGuardRef.cached = [...normalized];
     if (mode) {
       const existing = modeStatesRef.current[mode] || {
         messages: [],
@@ -396,22 +397,22 @@ const enforceHydratedMessages = (
         showCompletedStep: false,
         completedStepText: '',
       };
-      modeStatesRef.current[mode] = { ...existing, messages: [...target] };
+      modeStatesRef.current[mode] = { ...existing, messages: [...normalized] };
     }
     try {
       persistChatStateNowRef.current?.({ force: true });
     } catch {}
-    if (DEBUG_TRACE) traceLog(label || 'HYDRATE_REAPPLY_FORCE', { sessionKey, mode, targetLen: target.length, ...(extra || {}) });
+    if (DEBUG_TRACE) traceLog(label || 'HYDRATE_REAPPLY_FORCE', { sessionKey, mode, targetLen: normalized.length, ...(extra || {}) });
   };
 
-  setMessages(target);
-  messagesRef.current = [...target];
+  setMessages(normalized);
+  messagesRef.current = [...normalized];
   hydratedGuardRef.sessionKey = sessionKey;
   hydratedGuardRef.mode = mode;
-  hydratedGuardRef.minLen = target.length;
+  hydratedGuardRef.minLen = normalized.length;
   hydratedGuardRef.lockedMode = mode;
-  hydratedGuardRef.cached = [...target];
-  lastFinalMessagesLenRef.current = target.length;
+  hydratedGuardRef.cached = [...normalized];
+  lastFinalMessagesLenRef.current = normalized.length;
   lastFinalPersistRef.current = 0;
   try {
     persistChatStateNowRef.current?.({ force: true });
@@ -422,7 +423,7 @@ const enforceHydratedMessages = (
       const activeKey = resolveActiveSessionKey();
       if (activeKey === sessionKey) {
         const uiLen = messagesRef.current?.length || 0;
-        if (uiLen < target.length) {
+        if (uiLen < normalized.length) {
           reassertHydratedTarget('HYDRATE_ENFORCE', { uiLen, delay });
           try {
             persistChatStateNowRef.current?.({ force: true });
@@ -582,6 +583,21 @@ const enforceHydratedMessages = (
         isVisible: true,
         isTyping: false,
       }));
+
+const ensureUniqueMessageIds = (msgs: Message[]): Message[] => {
+  const seen = new Set<string>();
+  let fallback = 0;
+  return msgs.map((m) => {
+    let id = m.id || `msg-${fallback++}`;
+    if (seen.has(id)) {
+      let suffix = 1;
+      while (seen.has(`${id}-${suffix}`)) suffix += 1;
+      id = `${id}-${suffix}`;
+    }
+    seen.add(id);
+    return { ...m, id };
+  });
+};
 
   const trimMessages = (msgs: Message[]): Message[] => {
     if (!Array.isArray(msgs)) return [];
@@ -837,7 +853,7 @@ const enforceHydratedMessages = (
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
           // Safety: re-apply after render to avoid any late clobber (multiple retries).
-          const target = proState.messages || [];
+          const target = ensureUniqueMessageIds(proState.messages || []);
           const reapply = (delay?: number) => {
             setTimeout(() => {
               const activeKey = resolveActiveSessionKey();
@@ -910,7 +926,7 @@ const enforceHydratedMessages = (
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
-        const target = savedState.messages || [];
+        const target = ensureUniqueMessageIds(savedState.messages || []);
         const reapply = (delay?: number) => {
           setTimeout(() => {
             const activeKey = resolveActiveSessionKey();
@@ -976,7 +992,7 @@ const enforceHydratedMessages = (
           isInitializedRef.current = true;
           scheduleReliableScrollRestore(st.scrollPosition ?? 0);
           if (DEBUG_TRACE) traceLog('HYDRATE_SWITCH_TO_MAX_MODE', { sessionKey: resolvedSessionKey || sessionKey, mode: best.m, count: st.messages.length });
-          const target = st.messages || [];
+          const target = ensureUniqueMessageIds(st.messages || []);
           const reapply = (delay?: number) => {
             setTimeout(() => {
               const activeKey = resolveActiveSessionKey();
