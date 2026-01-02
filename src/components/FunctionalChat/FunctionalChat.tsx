@@ -648,6 +648,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             lastSessionKeyRef.current = resolvedSessionKey || sessionKey || lastSessionKeyRef.current;
             setIsProjectSessionReady(true);
             setIsHydrationGateReady(true);
+            expectingHydrationRef.current = false;
           } catch {}
           return true;
         }
