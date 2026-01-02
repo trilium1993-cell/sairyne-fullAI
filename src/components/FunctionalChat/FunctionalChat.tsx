@@ -252,8 +252,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (
       guard.sessionKey &&
       guard.mode &&
+      guard.lockedMode &&
       sessionKey === guard.sessionKey &&
-      (selectedLearnLevel === guard.mode || previousModeRef.current === guard.mode) &&
+      (selectedLearnLevel === guard.lockedMode || previousModeRef.current === guard.lockedMode) &&
       messagesRef.current &&
       messagesRef.current.length >= guard.minLen &&
       messages.length < guard.minLen
@@ -261,6 +262,17 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       // Re-apply guarded state.
       setMessages(messagesRef.current);
       if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_REAPPLY_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
+      return;
+    }
+    // If guard is active and render comes from a different mode, ignore.
+    if (
+      guard.sessionKey &&
+      guard.lockedMode &&
+      sessionKey === guard.sessionKey &&
+      selectedLearnLevel !== guard.lockedMode &&
+      previousModeRef.current !== guard.lockedMode
+    ) {
+      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_IGNORE_OTHER_MODE', { sessionKey, lockedMode: guard.lockedMode, currentMode: selectedLearnLevel });
       return;
     }
     messagesRef.current = messages;
@@ -307,10 +319,16 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const MAX_MESSAGES_PER_MODE = 200;
   const TOMBSTONE = '0';
 const DEBUG_TRACE = true;
-const hydratedGuardRef: { sessionKey: string | null; mode: string | null; minLen: number } = {
+const hydratedGuardRef: {
+  sessionKey: string | null;
+  mode: string | null;
+  minLen: number;
+  lockedMode: string | null;
+} = {
   sessionKey: null,
   mode: null,
   minLen: 0,
+  lockedMode: null,
 };
 const traceLog = (label: string, payload?: any) => {
   try {
@@ -344,6 +362,7 @@ const enforceHydratedMessages = (
   hydratedGuardRef.sessionKey = sessionKey;
   hydratedGuardRef.mode = mode;
   hydratedGuardRef.minLen = target.length;
+  hydratedGuardRef.lockedMode = mode;
   lastFinalMessagesLenRef.current = target.length;
   lastFinalPersistRef.current = 0;
   try {
@@ -361,6 +380,7 @@ const enforceHydratedMessages = (
           hydratedGuardRef.sessionKey = sessionKey;
           hydratedGuardRef.mode = mode;
           hydratedGuardRef.minLen = target.length;
+          hydratedGuardRef.lockedMode = mode;
           if (DEBUG_TRACE) traceLog('HYDRATE_ENFORCE', { sessionKey, mode, targetLen: target.length, uiLen, delay });
           try {
             persistChatStateNowRef.current?.({ force: true });
@@ -762,6 +782,7 @@ const enforceHydratedMessages = (
             persistChatStateNowRef,
             resolveActiveSessionKey
           );
+          hydratedGuardRef.lockedMode = 'pro';
           setCurrentStep(proState.currentStep || 0);
           setShowOptions(!!proState.showOptions);
           setShowGenres(!!proState.showGenres);
@@ -770,6 +791,7 @@ const enforceHydratedMessages = (
           setCompletedStepText(proState.completedStepText || '');
           if (proState.messages && proState.messages.length > 0) {
             isInitializedRef.current = true;
+            previousModeRef.current = 'pro';
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
           // Safety: re-apply after render to avoid any late clobber.
@@ -781,15 +803,12 @@ const enforceHydratedMessages = (
               if (uiCount < target.length) {
                 setMessages([...target]);
                 messagesRef.current = [...target];
-                lastFinalMessagesLenRef.current = target.length;
-                lastFinalPersistRef.current = 0;
                 hydratedGuardRef.sessionKey = activeKey;
                 hydratedGuardRef.mode = 'pro';
                 hydratedGuardRef.minLen = target.length;
+                hydratedGuardRef.lockedMode = 'pro';
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount });
-                try {
-                  persistChatStateNowRef.current?.({ force: true });
-                } catch {}
+                // No extra persist here; state already saved on first apply.
               }
             }
           }, 40);
@@ -816,6 +835,7 @@ const enforceHydratedMessages = (
           persistChatStateNowRef,
           resolveActiveSessionKey
         );
+        hydratedGuardRef.lockedMode = active;
         setCurrentStep(savedState.currentStep);
         setShowOptions(savedState.showOptions);
         setShowGenres(savedState.showGenres);
@@ -838,15 +858,12 @@ const enforceHydratedMessages = (
             if (uiCount < target.length) {
               setMessages([...target]);
               messagesRef.current = [...target];
-              lastFinalMessagesLenRef.current = target.length;
-              lastFinalPersistRef.current = 0;
               hydratedGuardRef.sessionKey = activeKey;
               hydratedGuardRef.mode = active;
               hydratedGuardRef.minLen = target.length;
+              hydratedGuardRef.lockedMode = active;
               if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount });
-              try {
-                persistChatStateNowRef.current?.({ force: true });
-              } catch {}
+              // No extra persist here; state already saved on first apply.
             }
           }
         }, 40);
@@ -872,6 +889,7 @@ const enforceHydratedMessages = (
             persistChatStateNowRef,
             resolveActiveSessionKey
           );
+          hydratedGuardRef.lockedMode = best.m;
           setCurrentStep(st.currentStep || 0);
           setShowOptions(!!st.showOptions);
           setShowGenres(!!st.showGenres);
@@ -889,15 +907,12 @@ const enforceHydratedMessages = (
               if (uiCount < target.length) {
                 setMessages([...target]);
                 messagesRef.current = [...target];
-                lastFinalMessagesLenRef.current = target.length;
-                lastFinalPersistRef.current = 0;
                 hydratedGuardRef.sessionKey = activeKey;
                 hydratedGuardRef.mode = best.m;
                 hydratedGuardRef.minLen = target.length;
+                hydratedGuardRef.lockedMode = best.m;
                 if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount });
-                try {
-                  persistChatStateNowRef.current?.({ force: true });
-                } catch {}
+                // No extra persist here; state already saved on first apply.
               }
             }
           }, 40);
@@ -1076,6 +1091,8 @@ const enforceHydratedMessages = (
     hydratedGuardRef.sessionKey = null;
     hydratedGuardRef.mode = null;
     hydratedGuardRef.minLen = 0;
+    hydratedGuardRef.lockedMode = null;
+    hydratedGuardRef.lockedMode = null;
     const message: Message = {
       id: makeId('ai'),
       type: 'ai',
@@ -1758,6 +1775,7 @@ const enforceHydratedMessages = (
   hydratedGuardRef.sessionKey = null;
   hydratedGuardRef.mode = null;
   hydratedGuardRef.minLen = 0;
+  hydratedGuardRef.lockedMode = null;
     const message: Message = {
       id: makeId('user'),
       type: 'user',
