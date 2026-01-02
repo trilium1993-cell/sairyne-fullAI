@@ -255,11 +255,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       sessionKey === guard.sessionKey &&
       (selectedLearnLevel === guard.mode || previousModeRef.current === guard.mode) &&
       messagesRef.current &&
-      messagesRef.current.length < guard.minLen &&
+      messagesRef.current.length >= guard.minLen &&
       messages.length < guard.minLen
     ) {
-      // Ignore this render update; keep the higher-count messagesRef.
-      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_SKIP_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
+      // Re-apply guarded state.
+      setMessages(messagesRef.current);
+      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_REAPPLY_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
       return;
     }
     messagesRef.current = messages;
@@ -331,6 +332,44 @@ const traceLog = (label: string, payload?: any) => {
   };
 
   const lastSessionKeyRef = useRef<string | null>(null);
+const enforceHydratedMessages = (
+  target: Message[],
+  sessionKey: string | null,
+  mode: string | null,
+  persistChatStateNowRef: React.MutableRefObject<((opts?: { force?: boolean }) => void) | null>,
+  resolveActiveSessionKey: () => string | null
+) => {
+  setMessages(target);
+  messagesRef.current = [...target];
+  hydratedGuardRef.sessionKey = sessionKey;
+  hydratedGuardRef.mode = mode;
+  hydratedGuardRef.minLen = target.length;
+  lastFinalMessagesLenRef.current = target.length;
+  lastFinalPersistRef.current = 0;
+  try {
+    persistChatStateNowRef.current?.({ force: true });
+  } catch {}
+  // retry a couple of times in case a late render clobbers state
+  [0, 50, 120].forEach((delay) => {
+    setTimeout(() => {
+      const activeKey = resolveActiveSessionKey();
+      if (activeKey === sessionKey) {
+        const uiLen = messagesRef.current?.length || 0;
+        if (uiLen < target.length) {
+          setMessages(target);
+          messagesRef.current = [...target];
+          hydratedGuardRef.sessionKey = sessionKey;
+          hydratedGuardRef.mode = mode;
+          hydratedGuardRef.minLen = target.length;
+          if (DEBUG_TRACE) traceLog('HYDRATE_ENFORCE', { sessionKey, mode, targetLen: target.length, uiLen, delay });
+          try {
+            persistChatStateNowRef.current?.({ force: true });
+          } catch {}
+        }
+      }
+    }, delay);
+  });
+};
   const hasPersistedMessagesForSession = useCallback((sessionKey: string | null): boolean | null => {
     if (!sessionKey) return null;
     try {
@@ -716,13 +755,13 @@ const traceLog = (label: string, payload?: any) => {
           previousModeRef.current = 'pro';
           forcedProHydrateRef.current = true;
           setSelectedLearnLevel('pro');
-          setMessages([...(proState.messages || [])]);
-          messagesRef.current = [...(proState.messages || [])];
-          lastFinalMessagesLenRef.current = proState.messages?.length || 0;
-          lastFinalPersistRef.current = 0;
-          hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
-          hydratedGuardRef.mode = 'pro';
-          hydratedGuardRef.minLen = proState.messages?.length || 0;
+          enforceHydratedMessages(
+            [...(proState.messages || [])],
+            resolvedSessionKey || sessionKey || null,
+            'pro',
+            persistChatStateNowRef,
+            resolveActiveSessionKey
+          );
           setCurrentStep(proState.currentStep || 0);
           setShowOptions(!!proState.showOptions);
           setShowGenres(!!proState.showGenres);
@@ -770,13 +809,13 @@ const traceLog = (label: string, payload?: any) => {
       const active = previousModeRef.current || 'learn';
       const savedState = modeStatesRef.current[active];
       if (savedState) {
-        setMessages([...savedState.messages]);
-        messagesRef.current = [...savedState.messages];
-        lastFinalMessagesLenRef.current = savedState.messages?.length || 0;
-        lastFinalPersistRef.current = 0;
-        hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
-        hydratedGuardRef.mode = active;
-        hydratedGuardRef.minLen = savedState.messages?.length || 0;
+        enforceHydratedMessages(
+          [...(savedState.messages)],
+          resolvedSessionKey || sessionKey || null,
+          active,
+          persistChatStateNowRef,
+          resolveActiveSessionKey
+        );
         setCurrentStep(savedState.currentStep);
         setShowOptions(savedState.showOptions);
         setShowGenres(savedState.showGenres);
@@ -826,13 +865,13 @@ const traceLog = (label: string, payload?: any) => {
           previousModeRef.current = best.m;
           forcedProHydrateRef.current = forcedProHydrateRef.current || best.m === 'pro';
           setSelectedLearnLevel(best.m);
-          setMessages([...(st.messages || [])]);
-          messagesRef.current = [...(st.messages || [])];
-          lastFinalMessagesLenRef.current = st.messages?.length || 0;
-          lastFinalPersistRef.current = 0;
-          hydratedGuardRef.sessionKey = resolvedSessionKey || sessionKey || null;
-          hydratedGuardRef.mode = best.m;
-          hydratedGuardRef.minLen = st.messages?.length || 0;
+          enforceHydratedMessages(
+            [...(st.messages || [])],
+            resolvedSessionKey || sessionKey || null,
+            best.m,
+            persistChatStateNowRef,
+            resolveActiveSessionKey
+          );
           setCurrentStep(st.currentStep || 0);
           setShowOptions(!!st.showOptions);
           setShowGenres(!!st.showGenres);
