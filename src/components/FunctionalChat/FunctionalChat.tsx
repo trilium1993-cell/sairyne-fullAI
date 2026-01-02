@@ -343,6 +343,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     //   Wait until hydration succeeds (prevents "flash then disappear").
     // - If we know there are no messages, open quickly.
     // - If unknown (chat state not loaded yet), wait a bit longer for JUCE to inject; then open.
+    lastFinalPersistRef.current = 0;
+    lastFinalMessagesLenRef.current = 0;
     const hasPersisted = hasPersistedMessagesForSession(sessionKey);
     setIsHydrationGateReady(false);
     if (hasPersisted === true) {
@@ -423,6 +425,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     modeStatesRef.current = emptyModeStates as any;
     previousModeRef.current = 'learn';
   hydrationPersistLockRef.current = { sessionKey: null, unlocked: true };
+    lastFinalPersistRef.current = 0;
+    lastFinalMessagesLenRef.current = 0;
     setSelectedLearnLevel('learn');
     setMessages([]);
     setCurrentStep(0);
@@ -561,6 +565,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         previousModeRef.current = 'learn';
         setSelectedLearnLevel('learn');
         messagesRef.current = [];
+        lastFinalPersistRef.current = 0;
+        lastFinalMessagesLenRef.current = 0;
         setMessages([]);
         setCurrentStep(0);
         setShowOptions(false);
@@ -1248,9 +1254,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!root.sessions || typeof root.sessions !== 'object') root.sessions = {};
     root.v = 2;
     // Do NOT persist pendingAi; it can leave the session "stuck" on reopen.
-    if (existingSession && existingSession.modeStates) {
+      if (existingSession && existingSession.modeStates) {
       const mergedModeStates: any = { ...sessionPayload.modeStates };
-      let increased = false;
       ['learn', 'create', 'pro'].forEach((m) => {
         const oldMsgs = existingSession.modeStates?.[m]?.messages;
         const newMsgs = sessionPayload.modeStates?.[m]?.messages;
@@ -1258,8 +1263,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         const newCount = Array.isArray(newMsgs) ? newMsgs.length : 0;
         if (oldCount > newCount) {
           mergedModeStates[m] = existingSession.modeStates[m];
-        } else if (newCount > oldCount) {
-          increased = true;
         }
       });
       sessionPayload.modeStates = mergedModeStates;
