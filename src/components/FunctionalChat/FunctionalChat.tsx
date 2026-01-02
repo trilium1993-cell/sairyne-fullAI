@@ -231,6 +231,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   });
   // When a final (force) persist just happened, block non-force persists until new message
   const lastFinalPersistRef = useRef<number>(0);
+  const lastFinalMessagesLenRef = useRef<number>(0);
+  const pendingAutoPersistTimerRef = useRef<number | null>(null);
+  const persistSoonTimerRef = useRef<number | null>(null);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
@@ -906,9 +909,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isThinking
     };
 
-    // Block non-force persists until this AI completes.
-    lastFinalPersistRef.current = Date.now() + 10_000;
-
     // Snapshot full content immediately for persistence even while animating typing
     try {
       const finalMsg: Message = { ...message, content, isTyping: false, isThinking: false };
@@ -916,7 +916,6 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const snapshot = [...base, finalMsg];
       snapshotActiveModeMessages(snapshot);
       persistChatStateNowRef.current?.({ force: true });
-      lastFinalPersistRef.current = Date.now();
     } catch {}
 
     setMessages(prev => {
@@ -1106,12 +1105,13 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const force = Boolean(opts?.force);
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+    const currentMessagesLen = Math.max(messagesRef.current?.length ?? 0, messages.length);
     // Avoid persisting while hydration gate is closed unless explicitly forced.
     if (!isHydrationGateReady && !force) {
       return;
     }
-    // If we recently wrote a final snapshot, ignore non-force persists until a new message arrives.
-    if (!force && lastFinalPersistRef.current && Date.now() - lastFinalPersistRef.current < 2000) {
+    // If we have a recent final snapshot and no new messages, block non-force persists to avoid overwriting.
+    if (!force && lastFinalPersistRef.current && currentMessagesLen <= (lastFinalMessagesLenRef.current || 0)) {
       return;
     }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
@@ -1165,6 +1165,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       completedStepText,
     };
     const liveMessages = messagesRef.current && messagesRef.current.length >= messages.length ? messagesRef.current : messages;
+    const liveMessagesLen = liveMessages.length;
     modeStatesRef.current[activeMode] = {
       ...existingActive,
       messages: trimMessages(liveMessages),
@@ -1250,6 +1251,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     root.savedAt = Date.now();
 
     safeSetItem(CHAT_STATE_KEY, JSON.stringify(root));
+    if (force) {
+      lastFinalPersistRef.current = Date.now();
+      lastFinalMessagesLenRef.current = liveMessagesLen;
+    }
   }, [completedSteps, hasCompletedAnalysis, selectedLearnLevel, trimMessages]);
 
   useEffect(() => {
@@ -1268,21 +1273,42 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     // In embedded JUCE hosts, autosaving large chat state on every small UI change can freeze/reload the WebView.
     // We persist explicitly at stable points (after send/after response) + on pagehide/beforeunload via scroll hook flush.
+    if (pendingAutoPersistTimerRef.current) {
+      window.clearTimeout(pendingAutoPersistTimerRef.current);
+      pendingAutoPersistTimerRef.current = null;
+    }
     if (isEmbedded) return;
-    const t = window.setTimeout(() => {
+    pendingAutoPersistTimerRef.current = window.setTimeout(() => {
       try {
         persistChatStateNow();
       } catch (e) {
         console.warn('[FunctionalChat] Failed to persist chat state:', e);
       }
     }, 900);
-    return () => window.clearTimeout(t);
+    return () => {
+      if (pendingAutoPersistTimerRef.current) {
+        window.clearTimeout(pendingAutoPersistTimerRef.current);
+        pendingAutoPersistTimerRef.current = null;
+      }
+    };
   }, [persistChatStateNow, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
   // Force flush on visibility/pagehide to capture the latest AI/user messages before unload.
   useEffect(() => {
     const forceFlush = () => {
       try {
+        if (persistSoonTimerRef.current) {
+          window.clearTimeout(persistSoonTimerRef.current);
+          persistSoonTimerRef.current = null;
+        }
+        if (pendingAutoPersistTimerRef.current) {
+          window.clearTimeout(pendingAutoPersistTimerRef.current);
+          pendingAutoPersistTimerRef.current = null;
+        }
+        if (scrollDebounceTimerRef.current) {
+          window.clearTimeout(scrollDebounceTimerRef.current);
+          scrollDebounceTimerRef.current = null;
+        }
         // If any message is still "typing", finalize it before persisting.
         if ((messagesRef.current || []).some((m) => (m as any)?.isTyping)) {
           const finalized = (messagesRef.current || []).map((m) =>
@@ -1294,6 +1320,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         }
         persistChatStateNowRef.current?.({ force: true });
         lastFinalPersistRef.current = Date.now();
+        lastFinalMessagesLenRef.current = (messagesRef.current || []).length;
         hydrationPersistLockRef.current = {
           sessionKey: resolveActiveSessionKey(),
           unlocked: true,
@@ -1533,6 +1560,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       unlocked: true,
     };
   }
+  lastFinalPersistRef.current = 0;
     const message: Message = {
       id: makeId('user'),
       type: 'user',
@@ -1577,6 +1605,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         unlocked: true,
       };
     }
+    lastFinalPersistRef.current = 0;
       const message: Message = {
         id: makeId('ai'),
         type: 'ai',
@@ -1617,11 +1646,19 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   const persistSoon = useCallback(() => {
     try {
+      if (persistSoonTimerRef.current) {
+        window.clearTimeout(persistSoonTimerRef.current);
+        persistSoonTimerRef.current = null;
+      }
       // Best-effort: allow React state to settle first.
-      window.setTimeout(() => {
+      persistSoonTimerRef.current = window.setTimeout(() => {
         try {
           persistChatStateNowRef.current?.();
         } catch {}
+        if (persistSoonTimerRef.current) {
+          window.clearTimeout(persistSoonTimerRef.current);
+          persistSoonTimerRef.current = null;
+        }
       }, 150);
     } catch {}
   }, []);
