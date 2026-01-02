@@ -272,6 +272,30 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     messagesRef.current = messages;
   }, [messages, selectedLearnLevel]);
 
+  // Layout-phase reapply: if guard cached exists for current session/mode, push it through RAF + delayed ticks.
+  useLayoutEffect(() => {
+    const guard = hydratedGuardRef;
+    const sessionKey = resolveActiveSessionKey();
+    if (!guard.cached.length || !guard.sessionKey || sessionKey !== guard.sessionKey) return;
+    if (guard.lockedMode && selectedLearnLevel !== guard.lockedMode && previousModeRef.current !== guard.lockedMode) return;
+    const apply = (label: string) => {
+      setMessages([...guard.cached]);
+      messagesRef.current = [...guard.cached];
+      if (DEBUG_TRACE) traceLog(label, { sessionKey, mode: guard.mode, len: guard.cached.length });
+    };
+    const raf1 = requestAnimationFrame(() => apply('HYDRATE_LAYOUT_RAF1'));
+    const raf2 = requestAnimationFrame(() => apply('HYDRATE_LAYOUT_RAF2'));
+    const t1 = window.setTimeout(() => apply('HYDRATE_LAYOUT_T200'), 200);
+    const t2 = window.setTimeout(() => apply('HYDRATE_LAYOUT_T400'), 400);
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLearnLevel]);
+
   // Global cursor spinner for "wait" states in chat (AI thinking / reconnecting / hydration).
   useEffect(() => {
     const hasThinking = messages.some((m) => (m as any)?.isThinking) || aiRequestInFlightRef.current;
