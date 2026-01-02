@@ -1248,6 +1248,34 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return () => window.clearTimeout(t);
   }, [persistChatStateNow, selectedLearnLevel, completedSteps, hasCompletedAnalysis, messages.length, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText]);
 
+  // Force flush on visibility/pagehide to capture the latest AI/user messages before unload.
+  useEffect(() => {
+    const forceFlush = () => {
+      try {
+        // If any message is still "typing", finalize it before persisting.
+        if ((messagesRef.current || []).some((m) => (m as any)?.isTyping)) {
+          messagesRef.current = (messagesRef.current || []).map((m) =>
+            (m as any)?.isTyping ? { ...m, isTyping: false } : m
+          );
+          setMessages(messagesRef.current);
+        }
+        persistChatStateNowRef.current?.({ force: true });
+      } catch {}
+    };
+    try {
+      document.addEventListener('visibilitychange', forceFlush);
+      window.addEventListener('pagehide', forceFlush);
+      window.addEventListener('beforeunload', forceFlush);
+    } catch {}
+    return () => {
+      try {
+        document.removeEventListener('visibilitychange', forceFlush);
+        window.removeEventListener('pagehide', forceFlush);
+        window.removeEventListener('beforeunload', forceFlush);
+      } catch {}
+    };
+  }, []);
+
   // Persist scroll position reliably.
   // In some hosts the chat container mounts after this component's first effect runs.
   // We attach/re-attach the scroll listener when the underlying DOM node becomes available.
