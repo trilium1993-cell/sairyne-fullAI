@@ -248,31 +248,26 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   useEffect(() => {
     const sessionKey = resolveActiveSessionKey();
     const guard = hydratedGuardRef;
-    // Guard: prevent late renders from dropping messages below hydrated minLen for this session/mode.
-    if (
-      guard.sessionKey &&
-      guard.mode &&
-      guard.lockedMode &&
-      sessionKey === guard.sessionKey &&
-      (selectedLearnLevel === guard.lockedMode || previousModeRef.current === guard.lockedMode) &&
-      messages.length < guard.minLen
-    ) {
-      // Re-apply guarded state.
+    // Guard: prevent late renders from dropping messages below hydrated minLen for this session.
+    if (guard.sessionKey && guard.mode && guard.lockedMode && sessionKey === guard.sessionKey && messages.length < guard.minLen) {
       setMessages(guard.cached || messagesRef.current || []);
       messagesRef.current = guard.cached?.length ? [...guard.cached] : messagesRef.current;
-      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_REAPPLY_SET_MESSAGES', { sessionKey, mode: guard.mode, uiLen: messages.length, guardMin: guard.minLen });
+      if (DEBUG_TRACE)
+        traceLog('HYDRATE_GUARD_REAPPLY_SET_MESSAGES', {
+          sessionKey,
+          mode: guard.mode,
+          uiLen: messages.length,
+          guardMin: guard.minLen,
+          lockedMode: guard.lockedMode,
+        });
       return;
     }
-    // If guard is active and render comes from a different mode, ignore.
-    if (
-      guard.sessionKey &&
-      guard.lockedMode &&
-      sessionKey === guard.sessionKey &&
-      selectedLearnLevel !== guard.lockedMode &&
-      previousModeRef.current !== guard.lockedMode
-    ) {
-      if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_IGNORE_OTHER_MODE', { sessionKey, lockedMode: guard.lockedMode, currentMode: selectedLearnLevel });
-      return;
+    // If guard is active and render comes from a different mode (and not shrinking), ignore.
+    if (guard.sessionKey && guard.lockedMode && sessionKey === guard.sessionKey && messages.length >= guard.minLen) {
+      if (selectedLearnLevel !== guard.lockedMode && previousModeRef.current !== guard.lockedMode) {
+        if (DEBUG_TRACE) traceLog('HYDRATE_GUARD_IGNORE_OTHER_MODE', { sessionKey, lockedMode: guard.lockedMode, currentMode: selectedLearnLevel });
+        return;
+      }
     }
     messagesRef.current = messages;
   }, [messages, selectedLearnLevel]);
