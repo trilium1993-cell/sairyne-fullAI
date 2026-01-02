@@ -1159,10 +1159,10 @@ const traceLog = (label: string, payload?: any) => {
       if (DEBUG_TRACE) traceLog('PERSIST_SKIP_GATE_CLOSED', { sessionKey, currentMessagesLen });
       return;
     }
-    // If we have a recent final snapshot and no new messages, block non-force persists to avoid overwriting.
+    // TEMP: allow persist even if lastFinal marker matches, to verify UI save/load issues.
     if (!force && lastFinalPersistRef.current && currentMessagesLen <= (lastFinalMessagesLenRef.current || 0)) {
-      if (DEBUG_TRACE) traceLog('PERSIST_SKIP_LAST_FINAL_LOCK', { sessionKey, currentMessagesLen, lastFinalMessagesLen: lastFinalMessagesLenRef.current, lastFinalPersistAt: lastFinalPersistRef.current });
-      return;
+      if (DEBUG_TRACE) traceLog('PERSIST_IGNORE_LAST_FINAL_LOCK', { sessionKey, currentMessagesLen, lastFinalMessagesLen: lastFinalMessagesLenRef.current, lastFinalPersistAt: lastFinalPersistRef.current });
+      // Intentionally do not return here.
     }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
     // If AI message is still typing and not forced, skip to avoid persisting empty content.
