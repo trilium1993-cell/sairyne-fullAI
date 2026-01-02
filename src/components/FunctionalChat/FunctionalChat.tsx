@@ -697,6 +697,8 @@ const traceLog = (label: string, payload?: any) => {
           setSelectedLearnLevel('pro');
           setMessages([...(proState.messages || [])]);
           messagesRef.current = [...(proState.messages || [])];
+          lastFinalMessagesLenRef.current = proState.messages?.length || 0;
+          lastFinalPersistRef.current = 0;
           setCurrentStep(proState.currentStep || 0);
           setShowOptions(!!proState.showOptions);
           setShowGenres(!!proState.showGenres);
@@ -725,6 +727,8 @@ const traceLog = (label: string, payload?: any) => {
       if (savedState) {
         setMessages([...savedState.messages]);
         messagesRef.current = [...savedState.messages];
+        lastFinalMessagesLenRef.current = savedState.messages?.length || 0;
+        lastFinalPersistRef.current = 0;
         setCurrentStep(savedState.currentStep);
         setShowOptions(savedState.showOptions);
         setShowGenres(savedState.showGenres);
@@ -756,6 +760,8 @@ const traceLog = (label: string, payload?: any) => {
           setSelectedLearnLevel(best.m);
           setMessages([...(st.messages || [])]);
           messagesRef.current = [...(st.messages || [])];
+          lastFinalMessagesLenRef.current = st.messages?.length || 0;
+          lastFinalPersistRef.current = 0;
           setCurrentStep(st.currentStep || 0);
           setShowOptions(!!st.showOptions);
           setShowGenres(!!st.showGenres);
