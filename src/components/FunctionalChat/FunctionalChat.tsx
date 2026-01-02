@@ -229,6 +229,8 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     sessionKey: null,
     unlocked: true,
   });
+  // When a final (force) persist just happened, block non-force persists until new message
+  const lastFinalPersistRef = useRef<number>(0);
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
@@ -894,6 +896,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         unlocked: true,
       };
     }
+    lastFinalPersistRef.current = 0;
     const message: Message = {
       id: makeId('ai'),
       type: 'ai',
@@ -903,6 +906,9 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isThinking
     };
 
+    // Block non-force persists until this AI completes.
+    lastFinalPersistRef.current = Date.now() + 10_000;
+
     // Snapshot full content immediately for persistence even while animating typing
     try {
       const finalMsg: Message = { ...message, content, isTyping: false, isThinking: false };
@@ -910,6 +916,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const snapshot = [...base, finalMsg];
       snapshotActiveModeMessages(snapshot);
       persistChatStateNowRef.current?.({ force: true });
+      lastFinalPersistRef.current = Date.now();
     } catch {}
 
     setMessages(prev => {
@@ -1103,6 +1110,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     if (!isHydrationGateReady && !force) {
       return;
     }
+    // If we recently wrote a final snapshot, ignore non-force persists until a new message arrives.
+    if (!force && lastFinalPersistRef.current && Date.now() - lastFinalPersistRef.current < 2000) {
+      return;
+    }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
     // If AI message is still typing and not forced, skip to avoid persisting empty content.
     if (!force && (messagesRef.current || []).some((m) => (m as any)?.isTyping === true)) {
@@ -1282,6 +1293,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           setMessages(finalized);
         }
         persistChatStateNowRef.current?.({ force: true });
+        lastFinalPersistRef.current = Date.now();
+        hydrationPersistLockRef.current = {
+          sessionKey: resolveActiveSessionKey(),
+          unlocked: true,
+        };
       } catch {}
     };
     try {
