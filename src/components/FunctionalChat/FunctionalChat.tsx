@@ -713,9 +713,18 @@ const traceLog = (label: string, payload?: any) => {
           setTimeout(() => {
             const activeKey = resolveActiveSessionKey();
             if (activeKey === (resolvedSessionKey || sessionKey)) {
-              setMessages([...(proState.messages || [])]);
-              messagesRef.current = [...(proState.messages || [])];
-              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: proState.messages?.length || 0 });
+              const uiCount = messagesRef.current?.length || 0;
+              const target = proState.messages || [];
+              if (uiCount < target.length) {
+                setMessages([...target]);
+                messagesRef.current = [...target];
+                lastFinalMessagesLenRef.current = target.length;
+                lastFinalPersistRef.current = 0;
+                if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount });
+                try {
+                  persistChatStateNowRef.current?.({ force: true });
+                } catch {}
+              }
             }
           }, 40);
           try {
@@ -755,9 +764,18 @@ const traceLog = (label: string, payload?: any) => {
         setTimeout(() => {
           const activeKey = resolveActiveSessionKey();
           if (activeKey === (resolvedSessionKey || sessionKey)) {
-            setMessages([...(savedState.messages || [])]);
-            messagesRef.current = [...(savedState.messages || [])];
-            if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: savedState.messages?.length || 0 });
+            const uiCount = messagesRef.current?.length || 0;
+            const target = savedState.messages || [];
+            if (uiCount < target.length) {
+              setMessages([...target]);
+              messagesRef.current = [...target];
+              lastFinalMessagesLenRef.current = target.length;
+              lastFinalPersistRef.current = 0;
+              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount });
+              try {
+                persistChatStateNowRef.current?.({ force: true });
+              } catch {}
+            }
           }
         }, 40);
         if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_ACTIVE', { sessionKey: resolvedSessionKey || sessionKey, active, count: savedState.messages.length });
@@ -791,9 +809,18 @@ const traceLog = (label: string, payload?: any) => {
           setTimeout(() => {
             const activeKey = resolveActiveSessionKey();
             if (activeKey === (resolvedSessionKey || sessionKey)) {
-              setMessages([...(st.messages || [])]);
-              messagesRef.current = [...(st.messages || [])];
-              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: st.messages?.length || 0 });
+              const uiCount = messagesRef.current?.length || 0;
+              const target = st.messages || [];
+              if (uiCount < target.length) {
+                setMessages([...target]);
+                messagesRef.current = [...target];
+                lastFinalMessagesLenRef.current = target.length;
+                lastFinalPersistRef.current = 0;
+                if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount });
+                try {
+                  persistChatStateNowRef.current?.({ force: true });
+                } catch {}
+              }
             }
           }, 40);
         }
