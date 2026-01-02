@@ -924,14 +924,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             : msg
         ));
         // Force-persist final AI text so it isn't dropped by typing filter.
-        setTimeout(() => {
-          try {
-            persistChatStateNowRef.current?.({ force: true });
-          } catch {}
-          if (onComplete) {
-            onComplete();
-          }
-        }, 50);
+        try {
+          persistChatStateNowRef.current?.({ force: true });
+        } catch {}
+        if (onComplete) {
+          onComplete();
+        }
       }
     };
 
@@ -1254,10 +1252,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       try {
         // If any message is still "typing", finalize it before persisting.
         if ((messagesRef.current || []).some((m) => (m as any)?.isTyping)) {
-          messagesRef.current = (messagesRef.current || []).map((m) =>
+          const finalized = (messagesRef.current || []).map((m) =>
             (m as any)?.isTyping ? { ...m, isTyping: false } : m
           );
-          setMessages(messagesRef.current);
+          messagesRef.current = finalized;
+          setMessages(finalized);
         }
         persistChatStateNowRef.current?.({ force: true });
       } catch {}
