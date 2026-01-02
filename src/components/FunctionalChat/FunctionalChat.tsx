@@ -555,9 +555,25 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const hasSessions = parsed.sessions && typeof parsed.sessions === 'object';
       let session = sessionKey && hasSessions ? parsed.sessions[sessionKey] : null;
 
-      // If current project session is missing, bail out (wait for next inject) instead of creating empty.
+      // If current project session is missing, initialize an empty in-memory session so new chats can persist.
       if (hasSessions && sessionKey && !session) {
-        return false;
+        resetUiToBlankSession();
+        previousModeRef.current = 'learn';
+        setSelectedLearnLevel('learn');
+        messagesRef.current = [];
+        setMessages([]);
+        setCurrentStep(0);
+        setShowOptions(false);
+        setShowGenres(false);
+        setShowReadyButton(false);
+        setShowCompletedStep(false);
+        setCompletedStepText('');
+        setIsProjectSessionReady(true);
+        setIsHydrationGateReady(true);
+        expectingHydrationRef.current = false;
+        hydrationPersistLockRef.current = { sessionKey, unlocked: true };
+        lastSessionKeyRef.current = sessionKey;
+        return true;
       }
 
       try {
