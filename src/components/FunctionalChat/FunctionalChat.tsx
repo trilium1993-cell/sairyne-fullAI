@@ -792,24 +792,27 @@ const enforceHydratedMessages = (
             previousModeRef.current = 'pro';
           }
           scheduleReliableScrollRestore(proState.scrollPosition ?? 0);
-          // Safety: re-apply after render to avoid any late clobber.
-          setTimeout(() => {
-            const activeKey = resolveActiveSessionKey();
-            if (activeKey === (resolvedSessionKey || sessionKey)) {
-              const uiCount = messagesRef.current?.length || 0;
-              const target = proState.messages || [];
-              if (uiCount < target.length) {
-                setMessages([...target]);
-                messagesRef.current = [...target];
-                hydratedGuardRef.sessionKey = activeKey;
-                hydratedGuardRef.mode = 'pro';
-                hydratedGuardRef.minLen = target.length;
-                hydratedGuardRef.lockedMode = 'pro';
-                if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount });
-                // No extra persist here; state already saved on first apply.
+          // Safety: re-apply after render to avoid any late clobber (multiple retries).
+          [40, 120, 260].forEach((delay) => {
+            setTimeout(() => {
+              const activeKey = resolveActiveSessionKey();
+              if (activeKey === (resolvedSessionKey || sessionKey)) {
+                const uiCount = messagesRef.current?.length || 0;
+                const target = proState.messages || [];
+                if (uiCount < target.length) {
+                  setMessages([...target]);
+                  messagesRef.current = [...target];
+                  hydratedGuardRef.sessionKey = activeKey;
+                  hydratedGuardRef.mode = 'pro';
+                  hydratedGuardRef.minLen = target.length;
+                  hydratedGuardRef.lockedMode = 'pro';
+                  hydratedGuardRef.cached = [...target];
+                  if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_PRO', { sessionKey: activeKey, count: target.length, uiCount, delay });
+                  // No extra persist here; state already saved on first apply.
+                }
               }
-            }
-          }, 40);
+            }, delay);
+          });
           try {
             lastSessionKeyRef.current = resolvedSessionKey || sessionKey || lastSessionKeyRef.current;
             setIsProjectSessionReady(true);
@@ -848,23 +851,26 @@ const enforceHydratedMessages = (
 
         // Restore scroll reliably (may require waiting for DOM/layout)
         scheduleReliableScrollRestore(savedState.scrollPosition ?? 0);
-        setTimeout(() => {
-          const activeKey = resolveActiveSessionKey();
-          if (activeKey === (resolvedSessionKey || sessionKey)) {
-            const uiCount = messagesRef.current?.length || 0;
-            const target = savedState.messages || [];
-            if (uiCount < target.length) {
-              setMessages([...target]);
-              messagesRef.current = [...target];
-              hydratedGuardRef.sessionKey = activeKey;
-              hydratedGuardRef.mode = active;
-              hydratedGuardRef.minLen = target.length;
-              hydratedGuardRef.lockedMode = active;
-              if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount });
-              // No extra persist here; state already saved on first apply.
+        [40, 120, 260].forEach((delay) => {
+          setTimeout(() => {
+            const activeKey = resolveActiveSessionKey();
+            if (activeKey === (resolvedSessionKey || sessionKey)) {
+              const uiCount = messagesRef.current?.length || 0;
+              const target = savedState.messages || [];
+              if (uiCount < target.length) {
+                setMessages([...target]);
+                messagesRef.current = [...target];
+                hydratedGuardRef.sessionKey = activeKey;
+                hydratedGuardRef.mode = active;
+                hydratedGuardRef.minLen = target.length;
+                hydratedGuardRef.lockedMode = active;
+                hydratedGuardRef.cached = [...target];
+                if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_ACTIVE', { sessionKey: activeKey, mode: active, count: target.length, uiCount, delay });
+                // No extra persist here; state already saved on first apply.
+              }
             }
-          }
-        }, 40);
+          }, delay);
+        });
         if (DEBUG_TRACE) traceLog('HYDRATE_APPLY_ACTIVE', { sessionKey: resolvedSessionKey || sessionKey, active, count: savedState.messages.length });
       }
 
@@ -897,23 +903,26 @@ const enforceHydratedMessages = (
           isInitializedRef.current = true;
           scheduleReliableScrollRestore(st.scrollPosition ?? 0);
           if (DEBUG_TRACE) traceLog('HYDRATE_SWITCH_TO_MAX_MODE', { sessionKey: resolvedSessionKey || sessionKey, mode: best.m, count: st.messages.length });
-          setTimeout(() => {
-            const activeKey = resolveActiveSessionKey();
-            if (activeKey === (resolvedSessionKey || sessionKey)) {
-              const uiCount = messagesRef.current?.length || 0;
-              const target = st.messages || [];
-              if (uiCount < target.length) {
-                setMessages([...target]);
-                messagesRef.current = [...target];
-                hydratedGuardRef.sessionKey = activeKey;
-                hydratedGuardRef.mode = best.m;
-                hydratedGuardRef.minLen = target.length;
-                hydratedGuardRef.lockedMode = best.m;
-                if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount });
-                // No extra persist here; state already saved on first apply.
+          [40, 120, 260].forEach((delay) => {
+            setTimeout(() => {
+              const activeKey = resolveActiveSessionKey();
+              if (activeKey === (resolvedSessionKey || sessionKey)) {
+                const uiCount = messagesRef.current?.length || 0;
+                const target = st.messages || [];
+                if (uiCount < target.length) {
+                  setMessages([...target]);
+                  messagesRef.current = [...target];
+                  hydratedGuardRef.sessionKey = activeKey;
+                  hydratedGuardRef.mode = best.m;
+                  hydratedGuardRef.minLen = target.length;
+                  hydratedGuardRef.lockedMode = best.m;
+                  hydratedGuardRef.cached = [...target];
+                  if (DEBUG_TRACE) traceLog('HYDRATE_REAPPLY_MAX_MODE', { sessionKey: activeKey, mode: best.m, count: target.length, uiCount, delay });
+                  // No extra persist here; state already saved on first apply.
+                }
               }
-            }
-          }, 40);
+            }, delay);
+          });
         }
       } catch {}
 
