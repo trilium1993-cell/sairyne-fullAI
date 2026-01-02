@@ -903,6 +903,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       isThinking
     };
 
+    // Snapshot full content immediately for persistence even while animating typing
+    try {
+      const finalMsg: Message = { ...message, content, isTyping: false, isThinking: false };
+      const base = messagesRef.current || [];
+      const snapshot = [...base, finalMsg];
+      snapshotActiveModeMessages(snapshot);
+      persistChatStateNowRef.current?.({ force: true });
+    } catch {}
+
     setMessages(prev => {
       const next = [...prev, message];
       snapshotActiveModeMessages(next);
