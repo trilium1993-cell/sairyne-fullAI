@@ -447,6 +447,28 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     return msgs.slice(msgs.length - MAX_MESSAGES_PER_MODE);
   };
 
+  // Snapshot helper: update active mode state with provided messages
+  const snapshotActiveModeMessages = useCallback(
+    (msgs: Message[]) => {
+      const mode = selectedLearnLevel || previousModeRef.current || 'learn';
+      const existing = modeStatesRef.current[mode] || {
+        messages: [],
+        currentStep,
+        scrollPosition: chatContainerRef.current?.scrollTop || 0,
+        showOptions,
+        showGenres,
+        showReadyButton,
+        showCompletedStep,
+        completedStepText,
+      };
+      modeStatesRef.current[mode] = {
+        ...existing,
+        messages: trimMessages(msgs),
+      };
+    },
+    [selectedLearnLevel, currentStep, showOptions, showGenres, showReadyButton, showCompletedStep, completedStepText, trimMessages]
+  );
+
   const scheduleReliableScrollRestore = useCallback((target: number) => {
     pendingInitialScrollRef.current = Math.max(0, Number.isFinite(target) ? target : 0);
     scrollRestoreAttemptsRef.current = 0;
@@ -883,21 +905,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
     setMessages(prev => {
       const next = [...prev, message];
-      const mode = selectedLearnLevel || previousModeRef.current || 'learn';
-      const existing = modeStatesRef.current[mode] || {
-        messages: [],
-        currentStep: 0,
-        scrollPosition: 0,
-        showOptions: false,
-        showGenres: false,
-        showReadyButton: false,
-        showCompletedStep: false,
-        completedStepText: '',
-      };
-      modeStatesRef.current[mode] = {
-        ...existing,
-        messages: trimMessages(next),
-      };
+      snapshotActiveModeMessages(next);
       return next;
     });
     // Scroll to the new message once when it appears
@@ -918,11 +926,16 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         wordIndex++;
         setTimeout(typeNextWord, 18);
       } else {
-        setMessages(prev => prev.map(msg =>
-          msg.id === message.id
-            ? { ...msg, isTyping: false }
-            : msg
-        ));
+        setMessages(prev => {
+          const next = prev.map(msg =>
+            msg.id === message.id
+              ? { ...msg, isTyping: false }
+              : msg
+          );
+          messagesRef.current = next;
+          snapshotActiveModeMessages(next);
+          return next;
+        });
         // Force-persist final AI text so it isn't dropped by typing filter.
         try {
           persistChatStateNowRef.current?.({ force: true });
@@ -934,7 +947,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
 
     setTimeout(typeNextWord, 50);
-  }, []);
+  }, [snapshotActiveModeMessages]);
 
   // Resume AI requests that were in-flight when the plugin UI was closed.
   const resumeAttemptedRef = useRef<Record<string, boolean>>({});
@@ -1256,6 +1269,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             (m as any)?.isTyping ? { ...m, isTyping: false } : m
           );
           messagesRef.current = finalized;
+          snapshotActiveModeMessages(finalized);
           setMessages(finalized);
         }
         persistChatStateNowRef.current?.({ force: true });
