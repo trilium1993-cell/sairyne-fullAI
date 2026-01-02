@@ -224,6 +224,11 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
   const [isHydrationGateReady, setIsHydrationGateReady] = useState(false);
   const hydrationTimerRef = useRef<number | null>(null);
   const expectingHydrationRef = useRef(false);
+  // Block writes immediately after hydration so we don't overwrite freshly loaded state
+  const hydrationPersistLockRef = useRef<{ sessionKey: string | null; unlocked: boolean }>({
+    sessionKey: null,
+    unlocked: true,
+  });
   const [isTogglingVisualTips, setIsTogglingVisualTips] = useState(false);
   const savedScrollPositionRef = useRef<number>(0);
   const analysisTimeoutRef = useRef<number | null>(null);
@@ -410,6 +415,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     };
     modeStatesRef.current = emptyModeStates as any;
     previousModeRef.current = 'learn';
+    hydrationPersistLockRef.current = { sessionKey: null, unlocked: true };
     setSelectedLearnLevel('learn');
     setMessages([]);
     setCurrentStep(0);
@@ -634,6 +640,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           forcedProHydrateRef.current = true;
           setSelectedLearnLevel('pro');
           setMessages([...(proState.messages || [])]);
+          messagesRef.current = [...(proState.messages || [])];
           setCurrentStep(proState.currentStep || 0);
           setShowOptions(!!proState.showOptions);
           setShowGenres(!!proState.showGenres);
@@ -649,6 +656,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             setIsProjectSessionReady(true);
             setIsHydrationGateReady(true);
             expectingHydrationRef.current = false;
+            hydrationPersistLockRef.current = { sessionKey: resolvedSessionKey || sessionKey || null, unlocked: false };
           } catch {}
           return true;
         }
@@ -659,6 +667,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       const savedState = modeStatesRef.current[active];
       if (savedState) {
         setMessages([...savedState.messages]);
+        messagesRef.current = [...savedState.messages];
         setCurrentStep(savedState.currentStep);
         setShowOptions(savedState.showOptions);
         setShowGenres(savedState.showGenres);
@@ -697,6 +706,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
           forcedProHydrateRef.current = forcedProHydrateRef.current || best.m === 'pro';
           setSelectedLearnLevel(best.m);
           setMessages([...(st.messages || [])]);
+          messagesRef.current = [...(st.messages || [])];
           setCurrentStep(st.currentStep || 0);
           setShowOptions(!!st.showOptions);
           setShowGenres(!!st.showGenres);
@@ -717,6 +727,7 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
         setIsProjectSessionReady(true);
         setIsHydrationGateReady(true);
         expectingHydrationRef.current = false;
+        hydrationPersistLockRef.current = { sessionKey: resolvedSessionKey || sessionKey || null, unlocked: false };
       } catch {}
 
       return true;
@@ -1068,6 +1079,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const force = Boolean(opts?.force);
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+    // Prevent overwriting freshly hydrated state before the user triggers a real change.
+    if (
+      hydrationPersistLockRef.current.sessionKey === sessionKey &&
+      hydrationPersistLockRef.current.unlocked === false &&
+      !force
+    ) {
+      return;
+    }
     try {
       const line = `PERSIST_SESSION | sessionKey=${sessionKey}`;
       console.log('[FunctionalChat]', line);
@@ -1434,6 +1453,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Добавляем пользовательское сообщение
   const addUserMessage = (content: string) => {
+  if (hydrationPersistLockRef.current.unlocked === false) {
+    hydrationPersistLockRef.current = {
+      sessionKey: hydrationPersistLockRef.current.sessionKey,
+      unlocked: true,
+    };
+  }
     const message: Message = {
       id: makeId('user'),
       type: 'user',
@@ -1472,6 +1497,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   const addAIMessageInstant = useCallback(
     (content: string) => {
+    if (hydrationPersistLockRef.current.unlocked === false) {
+      hydrationPersistLockRef.current = {
+        sessionKey: hydrationPersistLockRef.current.sessionKey,
+        unlocked: true,
+      };
+    }
       const message: Message = {
         id: makeId('ai'),
         type: 'ai',
