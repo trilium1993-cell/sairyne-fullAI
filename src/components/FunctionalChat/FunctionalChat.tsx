@@ -923,9 +923,15 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
             ? { ...msg, isTyping: false }
             : msg
         ));
-        if (onComplete) {
-          setTimeout(onComplete, 50);
-        }
+        // Force-persist final AI text so it isn't dropped by typing filter.
+        setTimeout(() => {
+          try {
+            persistChatStateNowRef.current?.({ force: true });
+          } catch {}
+          if (onComplete) {
+            onComplete();
+          }
+        }, 50);
       }
     };
 
@@ -1078,6 +1084,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       return;
     }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
+    // If AI message is still typing and not forced, skip to avoid persisting empty content.
+    if (!force && (messagesRef.current || []).some((m) => (m as any)?.isTyping === true)) {
+      return;
+    }
     if (
       hydrationPersistLockRef.current.sessionKey === sessionKey &&
       hydrationPersistLockRef.current.unlocked === false &&
@@ -1483,12 +1493,12 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
       };
       return next;
     });
-    // Persist on next tick so messagesRef is up-to-date.
+    // Persist shortly after to capture the new user message once state settles.
     setTimeout(() => {
       try {
         persistChatStateNowRef.current?.({ force: true });
       } catch {}
-    }, 0);
+    }, 80);
     // Scroll to the new message once when it appears
     scrollToNewMessage();
   };
