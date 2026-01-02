@@ -864,8 +864,14 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
 
   // Add AI message with typing animation (MUST be declared before resumeLastRequest to avoid TDZ crash)
   const addAIMessage = useCallback((content: string, onComplete?: () => void, isThinking?: boolean) => {
+    if (hydrationPersistLockRef.current.unlocked === false) {
+      hydrationPersistLockRef.current = {
+        sessionKey: hydrationPersistLockRef.current.sessionKey,
+        unlocked: true,
+      };
+    }
     const message: Message = {
-      id: `ai-${Date.now()}`,
+      id: makeId('ai'),
       type: 'ai',
       content: '',
       timestamp: Date.now(),
@@ -1065,6 +1071,10 @@ export const FunctionalChat = ({ onBack }: FunctionalChatProps = {}): JSX.Elemen
     const force = Boolean(opts?.force);
     const sessionKey = resolveActiveSessionKey();
     if (!sessionKey) return;
+    // Avoid persisting while hydration gate is closed unless explicitly forced.
+    if (!isHydrationGateReady && !force) {
+      return;
+    }
     // Prevent overwriting freshly hydrated state before the user triggers a real change.
     if (
       hydrationPersistLockRef.current.sessionKey === sessionKey &&
